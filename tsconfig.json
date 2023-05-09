@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "declaration": true,
+    "declarationDir": "lib/types",
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "lib": ["es2022", "dom"],
+    "module": "ES2020",
+    "moduleResolution": "Node",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "outDir": "lib",
+    "paths": {
+      "*": ["*"]
+    },
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "strict": true,
+    "strictNullChecks": false,
+    "target": "ESNext"
+  },
+  "exclude": ["node_modules", "lib", "./src/**/*.spec.ts"],
+  "include": ["**/*.ts"],
+  "types": ["chrome"],
+  "typeRoots": ["../node_modules/@types"]
+}
