@@ -27,6 +27,6 @@
   },
   "exclude": ["node_modules", "lib", "./src/**/*.spec.ts"],
   "include": ["**/*.ts"],
-  "types": ["chrome"],
+  "types": ["chrome", "jest"],
   "typeRoots": ["../node_modules/@types"]
 }

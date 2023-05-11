@@ -1,16 +1,34 @@
 import shajs from "sha.js";
 
-export type CodeChallengeMethod = "S256" | "plain";
+export type PkceMethod = "S256" | "plain";
 export type PromptType = "none" | "login" | "select_account" | "consent";
 
-export type StorageArea = Pick<
-  chrome.storage.LocalStorageArea | chrome.storage.SessionStorageArea,
-  "get" | "set" | "remove" | "onChanged"
->;
-export type IdentityApi = Pick<
-  typeof chrome.identity,
-  "launchWebAuthFlow" | "getRedirectURL"
->;
+export const DEFAULT_PCKE_METHOD: PkceMethod = "S256";
+export const DEFAULT_CODE_VERIFIER_LENGTH = 43;
+export const DEFAULT_MIN_SECONDS_TO_EXPIRATION = 60;
+export const DEFAULT_STORAGE_KEY_PREFIX = "oauth2StorageKey-";
+export const DEFAULT_PROMPT: PromptType = "none";
+
+/**
+ * A subset of the methods on {@code chrome.storage.StorageArea}.
+ */
+export interface StorageArea {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  set(items: { [key: string]: any }): Promise<void>;
+  remove(key: string): Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get(key: string): Promise<{ [key: string]: any }>;
+}
+
+/**
+ * A subset of the functions of {@code chrome.identity}.
+ */
+export interface IdentityApi {
+  launchWebAuthFlow(
+    details: chrome.identity.WebAuthFlowOptions
+  ): Promise<string | undefined>;
+  getRedirectURL(): string;
+}
 
 /**
  * An error reported by an OAuth server.
@@ -59,7 +77,7 @@ interface Oauth2StorageFixed {
   scope: string;
   accessToken: string;
   accessTokenUrl: string | undefined;
-  codeChallengeMethod: CodeChallengeMethod | undefined;
+  pkceMethod: PkceMethod | undefined;
 
   /**
    * Arbitrary data used to verify that data loaded from storage is valid.
@@ -116,14 +134,15 @@ export interface Oauth2ClientOptions {
   domainHint?: string;
 
   /**
-   * The code challenge method used for PKCE.  Defaults to S256.  Set to null to
-   * disable PKCE if necessary.
+   * The code challenge method used for PKCE.  Defaults to
+   * {@code DEFAULT_CODE_CHALLENGE_METHOD} (S256).  Set to null to disable PKCE
+   * if necessary.
    */
-  codeChallengeMethod?: CodeChallengeMethod | null;
+  pkceMethod?: PkceMethod | null;
 
   /**
    * The length of the code verifier string used for PKCE.  Must be between 43
-   * and 128.
+   * and 128.  Defaults to {@code DEFAULT_CODE_VERIFIER_LENGTH} (43).
    */
   codeVerifierLength?: number;
 
@@ -149,7 +168,8 @@ export interface Oauth2ClientOptions {
   /**
    * If a token is close to its expiration time, it is treated as expired.  This
    * parameter controls how many more seconds a token should be valid before it
-   * is considered expired.  Defaults to 60.
+   * is considered expired.  Defaults to
+   * {@code DEFAULT_MIN_SECONDS_TO_EXPIRATION} (60).
    */
   minSecondsToExpiration?: number;
 
@@ -175,6 +195,10 @@ export interface Oauth2ClientOptions {
    * does not match the current value, the saved data will not be used.
    */
   validationString?: string;
+
+  // for testing
+  codeVerifierForTesting?: string;
+  nonceForTesting?: string;
 }
 
 /**
@@ -185,7 +209,7 @@ export class Oauth2Client {
   readonly #clientId: string;
   readonly #prompt: string;
   readonly #scope: string;
-  readonly #codeChallengeMethod: CodeChallengeMethod | undefined;
+  readonly #pkceMethod: PkceMethod | undefined;
   readonly #codeVerifierLength: number | undefined;
   readonly #accessTokenUrl: string | undefined;
   readonly #clientSecretForTesting: string | undefined;
@@ -195,14 +219,16 @@ export class Oauth2Client {
   readonly #validationString: string | undefined;
   readonly #identityApi: IdentityApi;
   readonly #redirectUrl: string;
+  readonly #codeVerifierForTesting: string | undefined;
+  readonly #nonceForTesting: string | undefined;
 
   constructor(opts: Oauth2ClientOptions) {
-    if (opts.codeChallengeMethod && !opts.accessTokenUrl) {
-      throw Error("cannot specify codeChallengeMethod without accessTokenUrl");
+    if (opts.pkceMethod && !opts.accessTokenUrl) {
+      throw Error("cannot specify pkceMethod without accessTokenUrl");
     }
-    if ("codeVerifierLength" in opts && opts.codeChallengeMethod === null) {
+    if ("codeVerifierLength" in opts && opts.pkceMethod === null) {
       throw Error(
-        "cannot specify codeVerifierLength with null codeChallengeMethod"
+        "cannot specify codeVerifierLength with null pkceMethod"
       );
     }
 
@@ -213,19 +239,21 @@ export class Oauth2Client {
         ? opts.scopes
         : Array.from(opts.scopes).join(" ");
     this.#prompt = opts.prompt ?? "none";
-    this.#codeChallengeMethod =
-      opts.codeChallengeMethod === null
+    this.#pkceMethod =
+      opts.pkceMethod === null
         ? undefined
-        : opts.codeChallengeMethod ??
-          (opts.accessTokenUrl ? "S256" : undefined);
-    this.#codeVerifierLength = opts.codeVerifierLength ?? 43;
+        : opts.pkceMethod ??
+        (opts.accessTokenUrl ? DEFAULT_PCKE_METHOD : undefined);
+    this.#codeVerifierLength = opts.codeVerifierLength ?? DEFAULT_CODE_VERIFIER_LENGTH;
     this.#accessTokenUrl = opts.accessTokenUrl;
     this.#clientSecretForTesting = opts.clientSecretForTesting;
     this.#minSecondsToExpiration = opts.minSecondsToExpiration ?? 60;
-    this.#storageKey = opts.storageKey ?? "oauth2StorageKey-" + this.#clientId;
+    this.#storageKey = opts.storageKey ?? DEFAULT_STORAGE_KEY_PREFIX + this.#clientId;
     this.#storageArea = opts.storageArea ?? chrome.storage.local;
     this.#identityApi = opts.identityApi ?? chrome.identity;
     this.#validationString = opts.validationString;
+    this.#codeVerifierForTesting = opts.codeVerifierForTesting;
+    this.#nonceForTesting = opts.nonceForTesting;
 
     if (this.#codeVerifierLength < 43 || this.#codeVerifierLength > 128) {
       throw Error("codeChallengeLength must be between 43 and 128");
@@ -279,8 +307,8 @@ export class Oauth2Client {
       record.scope === this.#scope &&
       record.accessTokenUrl === this.#accessTokenUrl &&
       (!this.#accessTokenUrl || Boolean(record.refreshToken)) &&
-      record.codeChallengeMethod === this.#codeChallengeMethod &&
-      record.validationString === (this.#validationString ?? undefined)
+      record.pkceMethod === this.#pkceMethod &&
+      record.validationString === this.#validationString
     );
   }
 
@@ -294,7 +322,7 @@ export class Oauth2Client {
       clientId: this.#clientId,
       scope: this.#scope,
       accessTokenUrl: this.#accessTokenUrl,
-      codeChallengeMethod: this.#codeChallengeMethod,
+      pkceMethod: this.#pkceMethod,
       validationString: this.#validationString,
       ...record,
     };
@@ -321,11 +349,11 @@ export class Oauth2Client {
     extraValues: Record<string, string | undefined> = {}
   ): void {
     params.set("client_id", this.#clientId);
-    params.set("redirect_uri", this.#redirectUrl);
-    params.set("scope", this.#scope);
     if (includePrompt) {
       params.set("prompt", this.#prompt);
     }
+    params.set("redirect_uri", this.#redirectUrl);
+    params.set("scope", this.#scope);
     for (const key of Object.getOwnPropertyNames(extraValues)) {
       const value = extraValues[key];
       if (value !== undefined) {
@@ -337,9 +365,9 @@ export class Oauth2Client {
   async #fetchAccessTokenByImplicitFlow(): Promise<string> {
     const webAuthFlowUrl = new URL(this.#webAuthFlowUrl);
     this.#initSearchParams(webAuthFlowUrl.searchParams, true, {
-      response_type: "token",
+      nonce: this.#nonceForTesting ?? randomString(64),
       response_mode: "fragment",
-      nonce: randomString(64),
+      response_type: "token",
     });
 
     const identityResponse = await this.#identityApi.launchWebAuthFlow({
@@ -376,36 +404,38 @@ export class Oauth2Client {
   }
 
   async #fetchCode(): Promise<{ code: string; codeVerifier: string }> {
-    let codeVerifier = "";
-    if (this.#codeChallengeMethod && this.#codeVerifierLength) {
-      codeVerifier = randomString(this.#codeVerifierLength);
+    let codeVerifier: string | undefined;
+    if (this.#pkceMethod && this.#codeVerifierLength) {
+      codeVerifier = this.#codeVerifierForTesting ?? randomString(this.#codeVerifierLength);
     }
     const codeChallenge =
-      this.#codeChallengeMethod === "plain"
+      this.#pkceMethod === "plain"
         ? codeVerifier
-        : this.#codeChallengeMethod === "S256"
+        : this.#pkceMethod === "S256"
         ? shajs("sha256")
             .update(codeVerifier)
             .digest("base64")
             .replaceAll("+", "-")
             .replaceAll("/", "_")
             .replace("=", "")
-        : undefined;
+          : undefined;
+
+    console.log(codeVerifier, codeChallenge);
 
     const webAuthFlowUrl = new URL(this.#webAuthFlowUrl);
     this.#initSearchParams(webAuthFlowUrl.searchParams, true, {
-      response_type: "code",
-      response_mode: "fragment",
       code_challenge: codeChallenge,
-      code_challenge_method: this.#codeChallengeMethod,
+      code_challenge_method: this.#pkceMethod,
+      response_mode: "fragment",
+      response_type: "code",
     });
     if (codeChallenge) {
       webAuthFlowUrl.searchParams.set("code_challenge", codeChallenge);
     }
-    if (this.#codeChallengeMethod) {
+    if (this.#pkceMethod) {
       webAuthFlowUrl.searchParams.set(
         "code_challenge_method",
-        this.#codeChallengeMethod
+        this.#pkceMethod
       );
     }
     const identityResponse = await this.#identityApi.launchWebAuthFlow({
