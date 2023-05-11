@@ -89,11 +89,8 @@ describe.each([
       ...COMMON_CLIENT_OPTIONS,
       ...partialClientOptions,
     };
-    const {
-      prompt = DEFAULT_PROMPT,
-      storageKey = DEFAULT_STORAGE_KEY,
-      clientSecretForTesting,
-    } = outerClientOptions;
+    const { prompt = DEFAULT_PROMPT, storageKey = DEFAULT_STORAGE_KEY } =
+      outerClientOptions;
     const { interactive = false } = effectiveOptions;
 
     let fetchSpy: jest.SpyInstance;
@@ -218,7 +215,7 @@ describe.each([
     });
 
     describe.each([
-      ["defaults", {}, { codeChallengeMethod: DEFAULT_CODE_CHALLENGE_METHOD }],
+      ["defaults", {}, {}],
       [
         "overrides",
         {
@@ -242,8 +239,14 @@ describe.each([
           ...innerClientOptions,
           accessTokenUrl: ACCESS_TOKEN_URL,
         };
-        const { codeChallengeMethod = DEFAULT_CODE_CHALLENGE_METHOD } =
-          innerEffectiveOptions;
+        const { clientSecretForTesting } = {
+          clientSecretForTesting: undefined,
+          ...innerClientOptions,
+        };
+        const { codeChallengeMethod } = {
+          codeChallengeMethod: DEFAULT_CODE_CHALLENGE_METHOD,
+          ...innerEffectiveOptions,
+        };
 
         test("without cached token", async () => {
           const client = new Oauth2Client(clientOptions);

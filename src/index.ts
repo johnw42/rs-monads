@@ -239,18 +239,23 @@ export class Oauth2Client {
     this.#codeChallengeMethod =
       opts.codeChallengeMethod === null
         ? undefined
-        : opts.codeChallengeMethod ??
-        DEFAULT_CODE_CHALLENGE_METHOD;
-    this.#codeVerifierLength = opts.codeVerifierLength ?? DEFAULT_CODE_VERIFIER_LENGTH;
+        : opts.codeChallengeMethod ?? DEFAULT_CODE_CHALLENGE_METHOD;
+    this.#codeVerifierLength =
+      opts.codeVerifierLength ?? DEFAULT_CODE_VERIFIER_LENGTH;
     this.#accessTokenUrl = opts.accessTokenUrl;
     this.#clientSecretForTesting = opts.clientSecretForTesting;
     this.#minSecondsToExpiration = opts.minSecondsToExpiration ?? 60;
-    this.#storageKey = opts.storageKey ?? DEFAULT_STORAGE_KEY_PREFIX + this.#clientId;
+    this.#storageKey =
+      opts.storageKey ?? DEFAULT_STORAGE_KEY_PREFIX + this.#clientId;
     this.#storageArea = opts.storageArea ?? chrome.storage.local;
     this.#identityApi = opts.identityApi ?? chrome.identity;
     this.#validationString = opts.validationString;
     this.#codeVerifierForTesting = opts.codeVerifierForTesting;
     this.#nonceForTesting = opts.nonceForTesting;
+
+    if (!opts.accessTokenUrl && "codeChallengeMethod" in opts) {
+      console.warn("codeChallengeMethod is ignored without accessTokenUrl");
+    }
 
     if (this.#codeVerifierLength < 43 || this.#codeVerifierLength > 128) {
       throw Error("codeChallengeLength must be between 43 and 128");
@@ -403,7 +408,8 @@ export class Oauth2Client {
   async #fetchCode(): Promise<{ code: string; codeVerifier: string }> {
     let codeVerifier: string | undefined;
     if (this.#codeChallengeMethod && this.#codeVerifierLength) {
-      codeVerifier = this.#codeVerifierForTesting ?? randomString(this.#codeVerifierLength);
+      codeVerifier =
+        this.#codeVerifierForTesting ?? randomString(this.#codeVerifierLength);
     }
     const codeChallenge =
       this.#codeChallengeMethod === "plain"
@@ -415,7 +421,7 @@ export class Oauth2Client {
             .replaceAll("+", "-")
             .replaceAll("/", "_")
             .replace("=", "")
-          : undefined;
+        : undefined;
 
     const webAuthFlowUrl = new URL(this.#webAuthFlowUrl);
     this.#initSearchParams(webAuthFlowUrl.searchParams, true, {
