@@ -10,26 +10,6 @@ import {
   StorageArea,
 } from "../src";
 
-// class MockStorageArea implements StorageArea {
-//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//   readonly data: Record<string, any> = {};
-
-//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//   async set(items: { [key: string]: any }): Promise<void> {
-//     for (const key in items) {
-//       this.data[key] = items[key];
-//     }
-//   }
-//   async remove(key: string): Promise<void> {
-//     delete this.data[key];
-//   }
-
-//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//   async get(key: string): Promise<{ [key: string]: any }> {
-//     return this.data[key];
-//   }
-// }
-
 const START_TIME = 12345;
 const WEB_AUTH_FLOW_URL = "https://example.com/auth";
 const CLIENT_ID = "dummy client id";
