@@ -1,9 +1,9 @@
 import shajs from "sha.js";
 
-export type PkceMethod = "S256" | "plain";
+export type CodeChallengeMethod = "S256" | "plain";
 export type PromptType = "none" | "login" | "select_account" | "consent";
 
-export const DEFAULT_PCKE_METHOD: PkceMethod = "S256";
+export const DEFAULT_CODE_CHALLENGE_METHOD: CodeChallengeMethod = "S256";
 export const DEFAULT_CODE_VERIFIER_LENGTH = 43;
 export const DEFAULT_MIN_SECONDS_TO_EXPIRATION = 60;
 export const DEFAULT_STORAGE_KEY_PREFIX = "oauth2StorageKey-";
@@ -77,7 +77,7 @@ interface Oauth2StorageFixed {
   scope: string;
   accessToken: string;
   accessTokenUrl: string | undefined;
-  pkceMethod: PkceMethod | undefined;
+  codeChallengeMethod: CodeChallengeMethod | undefined;
 
   /**
    * Arbitrary data used to verify that data loaded from storage is valid.
@@ -138,7 +138,7 @@ export interface Oauth2ClientOptions {
    * {@link DEFAULT_CODE_CHALLENGE_METHOD} (S256).  Only relevant when
    * {@link accessTokenUrl} is set.  Set to null to disable PKCE if necessary.
    */
-  pkceMethod?: PkceMethod | null;
+  codeChallengeMethod?: CodeChallengeMethod | null;
 
   /**
    * The length of the code verifier string used for PKCE.  Must be between 43
@@ -209,7 +209,7 @@ export class Oauth2Client {
   readonly #clientId: string;
   readonly #prompt: string;
   readonly #scope: string;
-  readonly #pkceMethod: PkceMethod | undefined;
+  readonly #codeChallengeMethod: CodeChallengeMethod | undefined;
   readonly #codeVerifierLength: number | undefined;
   readonly #accessTokenUrl: string | undefined;
   readonly #clientSecretForTesting: string | undefined;
@@ -223,9 +223,9 @@ export class Oauth2Client {
   readonly #nonceForTesting: string | undefined;
 
   constructor(opts: Oauth2ClientOptions) {
-    if ("codeVerifierLength" in opts && opts.pkceMethod === null) {
+    if ("codeVerifierLength" in opts && opts.codeChallengeMethod === null) {
       throw Error(
-        "cannot specify codeVerifierLength with null pkceMethod"
+        "cannot specify codeVerifierLength with null codeChallengeMethod"
       );
     }
 
@@ -236,11 +236,11 @@ export class Oauth2Client {
         ? opts.scopes
         : Array.from(opts.scopes).join(" ");
     this.#prompt = opts.prompt ?? "none";
-    this.#pkceMethod =
-      opts.pkceMethod === null
+    this.#codeChallengeMethod =
+      opts.codeChallengeMethod === null
         ? undefined
-        : opts.pkceMethod ??
-        DEFAULT_PCKE_METHOD;
+        : opts.codeChallengeMethod ??
+        DEFAULT_CODE_CHALLENGE_METHOD;
     this.#codeVerifierLength = opts.codeVerifierLength ?? DEFAULT_CODE_VERIFIER_LENGTH;
     this.#accessTokenUrl = opts.accessTokenUrl;
     this.#clientSecretForTesting = opts.clientSecretForTesting;
@@ -304,7 +304,7 @@ export class Oauth2Client {
       record.scope === this.#scope &&
       record.accessTokenUrl === this.#accessTokenUrl &&
       (!this.#accessTokenUrl || Boolean(record.refreshToken)) &&
-      record.pkceMethod === this.#pkceMethod &&
+      record.codeChallengeMethod === this.#codeChallengeMethod &&
       record.validationString === this.#validationString
     );
   }
@@ -319,7 +319,7 @@ export class Oauth2Client {
       clientId: this.#clientId,
       scope: this.#scope,
       accessTokenUrl: this.#accessTokenUrl,
-      pkceMethod: this.#pkceMethod,
+      codeChallengeMethod: this.#codeChallengeMethod,
       validationString: this.#validationString,
       ...record,
     };
@@ -402,13 +402,13 @@ export class Oauth2Client {
 
   async #fetchCode(): Promise<{ code: string; codeVerifier: string }> {
     let codeVerifier: string | undefined;
-    if (this.#pkceMethod && this.#codeVerifierLength) {
+    if (this.#codeChallengeMethod && this.#codeVerifierLength) {
       codeVerifier = this.#codeVerifierForTesting ?? randomString(this.#codeVerifierLength);
     }
     const codeChallenge =
-      this.#pkceMethod === "plain"
+      this.#codeChallengeMethod === "plain"
         ? codeVerifier
-        : this.#pkceMethod === "S256"
+        : this.#codeChallengeMethod === "S256"
         ? shajs("sha256")
             .update(codeVerifier)
             .digest("base64")
@@ -420,17 +420,17 @@ export class Oauth2Client {
     const webAuthFlowUrl = new URL(this.#webAuthFlowUrl);
     this.#initSearchParams(webAuthFlowUrl.searchParams, true, {
       code_challenge: codeChallenge,
-      code_challenge_method: this.#pkceMethod,
+      code_challenge_method: this.#codeChallengeMethod,
       response_mode: "fragment",
       response_type: "code",
     });
     if (codeChallenge) {
       webAuthFlowUrl.searchParams.set("code_challenge", codeChallenge);
     }
-    if (this.#pkceMethod) {
+    if (this.#codeChallengeMethod) {
       webAuthFlowUrl.searchParams.set(
         "code_challenge_method",
-        this.#pkceMethod
+        this.#codeChallengeMethod
       );
     }
     const identityResponse = await this.#identityApi.launchWebAuthFlow({
