@@ -1,14 +1,71 @@
-# Project
+# chrome-extension-oauth2
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+This package aims to be, as much as possible, a "batteries-included" solution to
+[OAuth 2.0](https://oauth.net/2/) authentication in extensions for
+Chromium-compatible browsers such as Chrome and Edge.
 
-As the maintainer of this project, please make a few updates:
+## Status
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+This project is in prerelease.  Minor versions may introduce breaking changes to
+the API.
+
+## Prerequisities
+
+* The usual prerequisites for OAuth 2.0, such as a registered application with a
+  client ID, etc. to identify it to the authentication endpoints.  Some
+  familiarity with OAuth 2.0 framework will be needed to make use of this
+  library.
+* A browser that supports the `chrome.identity` and `chrome.storage` APIs, or
+  comparable APIs that can be adapted support the same function signatures.
+* Your extension must include the "identity" and "storage" permissions in its
+  manifest.
+* In order to support persistent authorization, you will need to run your own
+  server that accepts 
+
+## Features
+
+* Constructing and making HTTPS requests to OAuth 2.0 endpoints.
+* Saving credentials in persistent storage.
+* Refreshing expired credentials.
+* Reporting errors from OAuth 2.0 endpoints as specified by [RFC
+  6749](https://datatracker.ietf.org/doc/html/rfc6749).
+* PKCE using the `S256` and `plain` methods.
+* Full Typescript support.
+
+## Example Usage
+
+This example shows how to request a user's basic informtion using the Microsoft
+Graph API with the implicit grant flow.
+
+```typescript
+import { Oauth2Client } from "chrome-extension-oauth2";
+
+// The client should normally be kept at the global scope.
+const client = new Oauth2Client({
+    url: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    clientId: "<your-client-id>",
+    scopes: ["openid", "https://graph.microsoft.com/User.Read"],
+    prompt: "select_account",
+});
+
+// Fetch the information, requesting authorization from the user only if necessary.
+async function demo() {
+    const response = await client.fetch("https://graph.microsoft.com/v1.0/me");
+    console.log(await response.json());
+}
+```
+
+## Known Limitations
+
+* Only "authorization code" and "implicit" grant flows are supported.
+* Authorization types other than "Bearer" are not supported.
+* There is no way to set or retrieve the `state` field of requests or responses.
+
+## Related Work
+
+An older package,
+[browser-extension-oauth2](https://www.npmjs.com/package/browser-extension-oauth2)
+supports a smaller feature set an may be more appropriate for some users.
 
 ## Contributing
 

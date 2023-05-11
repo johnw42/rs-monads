@@ -10,7 +10,7 @@ export const DEFAULT_STORAGE_KEY_PREFIX = "oauth2StorageKey-";
 export const DEFAULT_PROMPT: PromptType = "none";
 
 /**
- * A subset of the methods on {@link chrome.storage.StorageArea}.
+ * A subset of the methods of {@link chrome.storage.StorageArea}.
  */
 export interface StorageArea {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,34 +40,48 @@ export class Oauth2ServerError extends Error {
      * value defined in the OAuth 2.0 spec or a vendor extension.
      */
     readonly errorType: string,
-    message: string
+
+    /**
+     * The error_description, if any, reported by the server.
+     */
+    readonly description?: string,
+
+    /**
+     * The error_uri, if any, reported by the server.
+     */
+    readonly uri?: string
   ) {
-    super(message);
+    super(
+      errorType +
+        (description ? ": " + description : "") +
+        (uri ? `(${uri})` : "")
+    );
   }
 }
 
-function maybeThrowOauth2Error(params: unknown): void {
-  let error: unknown;
-  let description: unknown;
+function maybeThrowOauth2Error(
+  params: URLSearchParams | ReturnType<typeof JSON.parse>
+): void {
+  let error: string | undefined | null;
+  let description: string | undefined | null;
+  let uri: string | undefined | null;
 
   if (params instanceof URLSearchParams) {
     error = params.get("error");
     description = params.get("error_description");
-  } else if (
-    typeof params === "object" &&
-    params &&
-    "error" in params &&
-    "description" in params
-  ) {
-    error = params.error as string;
-    description = params.description;
+    uri = params.get("error_uri");
+  } else if (params && typeof params.error === "string") {
+    error = params.error;
+    if (typeof params.error_description === "string") {
+      description = params.error_description;
+    }
+    if (typeof params.error_uri === "string") {
+      uri = params.error_uri;
+    }
   }
 
   if (typeof error === "string") {
-    throw new Oauth2ServerError(
-      error,
-      `${error}: ${description || "no description"}`
-    );
+    throw new Oauth2ServerError(error, description, uri);
   }
 }
 
@@ -159,7 +173,8 @@ export interface Oauth2ClientOptions {
    * The client secret to be passed to the
    * {@link Oauth2ClientOptions#accessTokenUrl}.  USE ONLY FOR TESTING. The
    * client secret should never be embedded directly in a browser extension.
-   * This parameter is marked deprecated as a reminder to avoid relying on it.
+   * This parameter is marked deprecated as a reminder to avoid relying on it in
+   * production.
    *
    * @deprecated
    */
@@ -196,8 +211,20 @@ export interface Oauth2ClientOptions {
    */
   validationString?: string;
 
-  // for testing
+  /**
+   * If set, specifies a fixed string to use to PCKE verification.  Use only for
+   * testing!
+   * 
+   * @deprecated
+   */
   codeVerifierForTesting?: string;
+
+  /**
+   * If set, specifies a fix string to use as a nonce for the implicit grant
+   * flow.  Use only for testing!
+   * 
+   * @deprecated
+   */
   nonceForTesting?: string;
 }
 
@@ -270,15 +297,17 @@ export class Oauth2Client {
    * {@link Oauth2ClientOptions#minSecondsToExpiration}), an attempt is made to
    * fetch a new access token.
    */
-  async getAccessToken(): Promise<string> {
+  async getAccessToken(): Promise<{ token: string }> {
     const record = await this.#loadRecord();
+    let token: string;
     if (record && !this.#recordExpired(record)) {
-      return record.accessToken;
+      token = record.accessToken;
     } else if (this.#accessTokenUrl) {
-      return await this.#fetchAccessTokenByGrant(record?.refreshToken);
+      token = await this.#fetchAccessTokenByGrant(record?.refreshToken);
     } else {
-      return await this.#fetchAccessTokenByImplicitFlow();
+      token = await this.#fetchAccessTokenByImplicitFlow();
     }
+    return { token };
   }
 
   /**
@@ -288,18 +317,17 @@ export class Oauth2Client {
     request: RequestInfo | URL,
     init: RequestInit = {}
   ): Promise<Response> {
-    const token = this.getAccessToken();
-    const headers = new Headers(init.headers);
-    headers.append("Authorization", "Bearer " + token);
-    init.headers = headers;
-    return await fetch(request, init);
+    const { token } = await this.getAccessToken();
+    const newRequest = new Request(request, init);
+    newRequest.headers.append("Authorization", "Bearer " + token);
+    return await fetch(newRequest);
   }
 
   /**
    * Clears all saved data associated with this client.
    */
   async clearSavedData(): Promise<void> {
-    this.#storageArea.remove(this.#storageKey);
+    await this.#storageArea.remove(this.#storageKey);
   }
 
   #recordIsValid(record: Oauth2StorageRecord): boolean {
