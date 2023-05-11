@@ -10,7 +10,7 @@ export const DEFAULT_STORAGE_KEY_PREFIX = "oauth2StorageKey-";
 export const DEFAULT_PROMPT: PromptType = "none";
 
 /**
- * A subset of the methods on {@code chrome.storage.StorageArea}.
+ * A subset of the methods on {@link chrome.storage.StorageArea}.
  */
 export interface StorageArea {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,7 +21,7 @@ export interface StorageArea {
 }
 
 /**
- * A subset of the functions of {@code chrome.identity}.
+ * A subset of the functions of {@link chrome.identity}.
  */
 export interface IdentityApi {
   launchWebAuthFlow(
@@ -135,14 +135,14 @@ export interface Oauth2ClientOptions {
 
   /**
    * The code challenge method used for PKCE.  Defaults to
-   * {@code DEFAULT_CODE_CHALLENGE_METHOD} (S256).  Set to null to disable PKCE
-   * if necessary.
+   * {@link DEFAULT_CODE_CHALLENGE_METHOD} (S256).  Only relevant when
+   * {@link accessTokenUrl} is set.  Set to null to disable PKCE if necessary.
    */
   pkceMethod?: PkceMethod | null;
 
   /**
    * The length of the code verifier string used for PKCE.  Must be between 43
-   * and 128.  Defaults to {@code DEFAULT_CODE_VERIFIER_LENGTH} (43).
+   * and 128.  Defaults to {@link DEFAULT_CODE_VERIFIER_LENGTH} (43).
    */
   codeVerifierLength?: number;
 
@@ -156,10 +156,10 @@ export interface Oauth2ClientOptions {
   accessTokenUrl?: string;
 
   /**
-   * The client secret to be passed to the {@code #accessTokenUrl}.  USE ONLY
-   * FOR TESTING. The client secret should never be embedded directly in a
-   * browser extension.  This parameter is marked deprecated as a reminder to
-   * avoid relying on it.
+   * The client secret to be passed to the
+   * {@link Oauth2ClientOptions#accessTokenUrl}.  USE ONLY FOR TESTING. The
+   * client secret should never be embedded directly in a browser extension.
+   * This parameter is marked deprecated as a reminder to avoid relying on it.
    *
    * @deprecated
    */
@@ -169,7 +169,7 @@ export interface Oauth2ClientOptions {
    * If a token is close to its expiration time, it is treated as expired.  This
    * parameter controls how many more seconds a token should be valid before it
    * is considered expired.  Defaults to
-   * {@code DEFAULT_MIN_SECONDS_TO_EXPIRATION} (60).
+   * {@link DEFAULT_MIN_SECONDS_TO_EXPIRATION} (60).
    */
   minSecondsToExpiration?: number;
 
@@ -181,12 +181,12 @@ export interface Oauth2ClientOptions {
 
   /**
    * The storage area where tokens are kept. Defaults to
-   * {@code chrome.storage.local}.
+   * {@link chrome.storage.local}.
    */
   storageArea?: StorageArea;
 
   /**
-   * The browser's identity API.  Defaults to {@code chrome.identity}.
+   * The browser's identity API.  Defaults to {@link chrome.identity}.
    */
   identityApi?: IdentityApi;
 
@@ -223,9 +223,6 @@ export class Oauth2Client {
   readonly #nonceForTesting: string | undefined;
 
   constructor(opts: Oauth2ClientOptions) {
-    if (opts.pkceMethod && !opts.accessTokenUrl) {
-      throw Error("cannot specify pkceMethod without accessTokenUrl");
-    }
     if ("codeVerifierLength" in opts && opts.pkceMethod === null) {
       throw Error(
         "cannot specify codeVerifierLength with null pkceMethod"
@@ -243,7 +240,7 @@ export class Oauth2Client {
       opts.pkceMethod === null
         ? undefined
         : opts.pkceMethod ??
-        (opts.accessTokenUrl ? DEFAULT_PCKE_METHOD : undefined);
+        DEFAULT_PCKE_METHOD;
     this.#codeVerifierLength = opts.codeVerifierLength ?? DEFAULT_CODE_VERIFIER_LENGTH;
     this.#accessTokenUrl = opts.accessTokenUrl;
     this.#clientSecretForTesting = opts.clientSecretForTesting;
@@ -265,7 +262,7 @@ export class Oauth2Client {
   /**
    * Attempts to get an unexpired access token.  If there is no token, the token
    * is expired, or the token will be expiring very soon (as defined by
-   * {@code Oauth2ClientOptions#minSecondsToExpiration}), an attempt is made to
+   * {@link Oauth2ClientOptions#minSecondsToExpiration}), an attempt is made to
    * fetch a new access token.
    */
   async getAccessToken(): Promise<string> {
@@ -419,8 +416,6 @@ export class Oauth2Client {
             .replaceAll("/", "_")
             .replace("=", "")
           : undefined;
-
-    console.log(codeVerifier, codeChallenge);
 
     const webAuthFlowUrl = new URL(this.#webAuthFlowUrl);
     this.#initSearchParams(webAuthFlowUrl.searchParams, true, {

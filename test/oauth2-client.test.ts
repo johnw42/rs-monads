@@ -6,6 +6,7 @@ import {
   IdentityApi,
   Oauth2Client,
   Oauth2ClientOptions,
+  PkceMethod,
   StorageArea,
 } from "../src";
 
@@ -45,6 +46,7 @@ const CUSTOM_STORAGE_KEY = "custom-storage-key";
 const MIN_SECONDS_TO_EXPIRATION = 30;
 const REFRESH_TOKEN = "fake refresh token";
 const NONCE = "fake nonce";
+const CLIENT_SECRET = "fake client secret";
 
 // A random 43-character string.
 const CODE_VERIFIER =
@@ -69,7 +71,7 @@ const mockIdentityApi = {
   },
 } satisfies IdentityApi;
 
-const COMMON_CLIENT_OPTIONS = {
+const COMMON_CLIENT_OPTIONS: Oauth2ClientOptions = {
   url: WEB_AUTH_FLOW_URL,
   clientId: CLIENT_ID,
   scopes: SCOPES_ARRAY,
@@ -78,258 +80,298 @@ const COMMON_CLIENT_OPTIONS = {
   minSecondsToExpiration: MIN_SECONDS_TO_EXPIRATION,
   codeVerifierForTesting: CODE_VERIFIER,
   nonceForTesting: NONCE,
-} satisfies Partial<Oauth2ClientOptions>;
+};
+
+interface EffectiveOptions {
+  interactive: boolean;
+  pkceMethod: PkceMethod | undefined;
+}
 
 describe.each([
-  ["defaults", COMMON_CLIENT_OPTIONS],
+  [
+    "defaults",
+    COMMON_CLIENT_OPTIONS,
+    { pkceMethod: DEFAULT_PCKE_METHOD, interactive: false },
+  ],
   [
     "overrides",
     {
       ...COMMON_CLIENT_OPTIONS,
       scopes: SCOPES_STRING,
       storageKey: CUSTOM_STORAGE_KEY,
+      pkceMethod: "plain",
+      prompt: "login",
+      clientSecretForTesting: CLIENT_SECRET,
+    } satisfies Oauth2ClientOptions,
+    { pkceMethod: "plain", interactive: true },
+  ],
+  [
+    "no PKCE",
+    {
+      ...COMMON_CLIENT_OPTIONS,
       pkceMethod: null,
     },
+    { pkceMethod: undefined, interactive: false },
   ],
-])("Oauth2Client with %s", (_, clientOptions: Oauth2ClientOptions) => {
-  const storageKey = clientOptions.storageKey ?? DEFAULT_STORAGE_KEY;
-  const pkceMethod =
-    clientOptions.pkceMethod === null ? undefined : DEFAULT_PCKE_METHOD;
+] satisfies [string, Oauth2ClientOptions, EffectiveOptions][])(
+  "Oauth2Client with %s",
+  (_, clientOptions: Oauth2ClientOptions, { pkceMethod, interactive }) => {
+    const {
+      prompt = DEFAULT_PROMPT,
+      storageKey = DEFAULT_STORAGE_KEY,
+      clientSecretForTesting,
+    } = clientOptions;
 
-  let fetchSpy: jest.SpyInstance;
+    let fetchSpy: jest.SpyInstance;
 
-  beforeEach(() => {
-    jest.useFakeTimers({ now: START_TIME });
-    mockStorageArea.get.mockClear();
-    mockStorageArea.set.mockClear();
-    mockStorageArea.remove.mockClear();
-    mockIdentityApi.launchWebAuthFlow.mockClear();
-    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => {
-      throw Error("not implemented");
-    });
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
-    jest.clearAllMocks();
-    jest.restoreAllMocks();
-  });
-
-  test("implicit flow", async () => {
-    const client = new Oauth2Client(clientOptions);
-
-    mockStorageArea.get.mockResolvedValueOnce({});
-    mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
-      `http://example.com#access_token=${ACCESS_TOKEN}&expires_in=${ACCESS_TOKEN_LIFETIME}`
-    );
-
-    const token = await client.getAccessToken();
-    expect(token).toBe(ACCESS_TOKEN);
-
-    const webAuthUrl = new URL(WEB_AUTH_FLOW_URL);
-    webAuthUrl.searchParams.set("client_id", CLIENT_ID);
-    webAuthUrl.searchParams.set("prompt", DEFAULT_PROMPT);
-    webAuthUrl.searchParams.set("redirect_uri", REDIRECT_URL);
-    webAuthUrl.searchParams.set("scope", SCOPES_STRING);
-    webAuthUrl.searchParams.set("nonce", NONCE);
-    webAuthUrl.searchParams.set("response_mode", "fragment");
-    webAuthUrl.searchParams.set("response_type", "token");
-    expect(mockIdentityApi.launchWebAuthFlow).toHaveBeenCalledWith({
-      url: webAuthUrl.toString(),
-      interactive: false,
+    beforeEach(() => {
+      jest.useFakeTimers({ now: START_TIME });
+      mockStorageArea.get.mockClear();
+      mockStorageArea.set.mockClear();
+      mockStorageArea.remove.mockClear();
+      mockIdentityApi.launchWebAuthFlow.mockClear();
+      fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => {
+        throw Error("not implemented");
+      });
     });
 
-    const storedValue = JSON.parse(
-      mockStorageArea.set.mock.calls[0][0][storageKey]
-    );
-    expect(storedValue).toEqual({
-      webAuthFlowUrl: WEB_AUTH_FLOW_URL,
-      clientId: CLIENT_ID,
-      scope: SCOPES_STRING,
-      expiration: EXPIRATION_TIME,
-      accessToken: ACCESS_TOKEN,
+    afterEach(() => {
+      jest.useRealTimers();
+      jest.clearAllMocks();
+      jest.restoreAllMocks();
     });
 
-    console.log(mockStorageArea.set.mock.calls);
-  });
+    test("implicit flow", async () => {
+      const client = new Oauth2Client(clientOptions);
 
-  test("implicit flow with expired token", async () => {
-    const client = new Oauth2Client(clientOptions);
+      mockStorageArea.get.mockResolvedValueOnce({});
 
-    mockStorageArea.get.mockResolvedValueOnce({
-      [storageKey]: JSON.stringify({
-        webAuthFlowUrl: WEB_AUTH_FLOW_URL,
-        clientId: CLIENT_ID,
-        scope: SCOPES_STRING,
-        expiration: 1000 * MIN_SECONDS_TO_EXPIRATION - Date.now() - 1,
-        accessToken: ACCESS_TOKEN,
-      }),
-    });
-    mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
-      `http://example.com#access_token=${ACCESS_TOKEN}&expires_in=${ACCESS_TOKEN_LIFETIME}`
-    );
+      mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+        `http://example.com#access_token=${ACCESS_TOKEN}&expires_in=${ACCESS_TOKEN_LIFETIME}`
+      );
 
-    const token = await client.getAccessToken();
-    expect(token).toBe(ACCESS_TOKEN);
+      const token = await client.getAccessToken();
+      expect(token).toBe(ACCESS_TOKEN);
 
-    const storedValue = JSON.parse(
-      mockStorageArea.set.mock.calls[0][0][storageKey]
-    );
-    expect(storedValue).toEqual({
-      webAuthFlowUrl: WEB_AUTH_FLOW_URL,
-      clientId: CLIENT_ID,
-      scope: SCOPES_STRING,
-      expiration: EXPIRATION_TIME,
-      accessToken: ACCESS_TOKEN,
-    });
-  });
+      const webAuthUrl = new URL(WEB_AUTH_FLOW_URL);
+      webAuthUrl.searchParams.set("client_id", CLIENT_ID);
+      webAuthUrl.searchParams.set("prompt", prompt);
+      webAuthUrl.searchParams.set("redirect_uri", REDIRECT_URL);
+      webAuthUrl.searchParams.set("scope", SCOPES_STRING);
+      webAuthUrl.searchParams.set("nonce", NONCE);
+      webAuthUrl.searchParams.set("response_mode", "fragment");
+      webAuthUrl.searchParams.set("response_type", "token");
+      expect(mockIdentityApi.launchWebAuthFlow).toHaveBeenCalledWith({
+        url: webAuthUrl.toString(),
+        interactive,
+      });
 
-  test("cached token", async () => {
-    const client = new Oauth2Client(clientOptions);
-
-    mockStorageArea.get.mockResolvedValueOnce({
-      [storageKey]: JSON.stringify({
+      const storedValue = JSON.parse(
+        mockStorageArea.set.mock.calls[0][0][storageKey]
+      );
+      expect(storedValue).toEqual({
         webAuthFlowUrl: WEB_AUTH_FLOW_URL,
         clientId: CLIENT_ID,
         scope: SCOPES_STRING,
         expiration: EXPIRATION_TIME,
-        accessToken: ACCESS_TOKEN,
-      }),
-    });
-
-    const token = await client.getAccessToken();
-    expect(token).toBe(ACCESS_TOKEN);
-
-    expect(mockIdentityApi.launchWebAuthFlow).not.toBeCalled();
-  });
-
-  test("authorization flow", async () => {
-    const client = new Oauth2Client({
-      ...clientOptions,
-      accessTokenUrl: ACCESS_TOKEN_URL,
-    });
-
-    mockStorageArea.get.mockResolvedValueOnce({});
-    mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
-      `http://example.com#code=${AUTH_CODE}`
-    );
-    fetchSpy.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          access_token: ACCESS_TOKEN,
-          expires_in: ACCESS_TOKEN_LIFETIME,
-          refresh_token: REFRESH_TOKEN,
-        })
-      )
-    );
-
-    const token = await client.getAccessToken();
-    expect(token).toBe(ACCESS_TOKEN);
-
-    const webAuthUrl = new URL(WEB_AUTH_FLOW_URL);
-    webAuthUrl.searchParams.set("client_id", CLIENT_ID);
-    webAuthUrl.searchParams.set("prompt", DEFAULT_PROMPT);
-    webAuthUrl.searchParams.set("redirect_uri", REDIRECT_URL);
-    webAuthUrl.searchParams.set("scope", SCOPES_STRING);
-    if (pkceMethod) {
-      webAuthUrl.searchParams.set("code_challenge", CODE_CHALLENGE);
-      webAuthUrl.searchParams.set("code_challenge_method", pkceMethod);
-    }
-    webAuthUrl.searchParams.set("response_mode", "fragment");
-    webAuthUrl.searchParams.set("response_type", "code");
-    expect(mockIdentityApi.launchWebAuthFlow).toHaveBeenCalledWith({
-      url: webAuthUrl.toString(),
-      interactive: false,
-    });
-
-    expect(fetchSpy).toHaveBeenCalledWith(ACCESS_TOKEN_URL, {
-      method: "post",
-      body: expect.any(URLSearchParams),
-    });
-    const fetchBody: URLSearchParams = fetchSpy.mock.calls[0][1].body;
-    expect(Object.fromEntries(fetchBody.entries())).toEqual({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URL,
-      scope: SCOPES_STRING,
-      grant_type: "authorization_code",
-      code: AUTH_CODE,
-      code_verifier: pkceMethod ? expect.any(String) : undefined,
-    });
-
-    const storedValue = JSON.parse(
-      mockStorageArea.set.mock.calls[0][0][storageKey]
-    );
-    expect(storedValue).toEqual({
-      webAuthFlowUrl: WEB_AUTH_FLOW_URL,
-      clientId: CLIENT_ID,
-      scope: SCOPES_STRING,
-      expiration: EXPIRATION_TIME,
-      accessToken: ACCESS_TOKEN,
-      refreshToken: REFRESH_TOKEN,
-      accessTokenUrl: ACCESS_TOKEN_URL,
-      pkceMethod,
-    });
-  });
-
-  test("authorization flow with refresh token", async () => {
-    const client = new Oauth2Client({
-      ...clientOptions,
-      accessTokenUrl: ACCESS_TOKEN_URL,
-    });
-
-    jest.setSystemTime(EXPIRATION_TIME + 1);
-    mockStorageArea.get.mockResolvedValueOnce({
-      [storageKey]: JSON.stringify({
-        webAuthFlowUrl: WEB_AUTH_FLOW_URL,
-        clientId: CLIENT_ID,
-        scope: SCOPES_STRING,
-        expiration: EXPIRATION_TIME,
-        accessTokenUrl: ACCESS_TOKEN_URL,
         accessToken: ACCESS_TOKEN,
         pkceMethod,
+      });
+    });
+
+    test("implicit flow with expired token", async () => {
+      const client = new Oauth2Client(clientOptions);
+
+      mockStorageArea.get.mockResolvedValueOnce({
+        [storageKey]: JSON.stringify({
+          webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+          clientId: CLIENT_ID,
+          scope: SCOPES_STRING,
+          expiration: 1000 * MIN_SECONDS_TO_EXPIRATION - Date.now() - 1,
+          accessToken: ACCESS_TOKEN,
+        }),
+      });
+
+      mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+        `http://example.com#access_token=${encodeURIComponent(
+          ACCESS_TOKEN
+        )}&expires_in=${encodeURIComponent(ACCESS_TOKEN_LIFETIME)}`
+      );
+
+      const token = await client.getAccessToken();
+      expect(token).toBe(ACCESS_TOKEN);
+
+      const storedValue = JSON.parse(
+        mockStorageArea.set.mock.calls[0][0][storageKey]
+      );
+      expect(storedValue).toEqual({
+        webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+        clientId: CLIENT_ID,
+        scope: SCOPES_STRING,
+        expiration: EXPIRATION_TIME,
+        accessToken: ACCESS_TOKEN,
+        pkceMethod,
+      });
+    });
+
+    test("cached token", async () => {
+      const client = new Oauth2Client(clientOptions);
+
+      mockStorageArea.get.mockResolvedValueOnce({
+        [storageKey]: JSON.stringify({
+          webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+          clientId: CLIENT_ID,
+          scope: SCOPES_STRING,
+          expiration: EXPIRATION_TIME,
+          accessToken: ACCESS_TOKEN,
+          pkceMethod,
+        }),
+      });
+
+      const token = await client.getAccessToken();
+      expect(token).toBe(ACCESS_TOKEN);
+
+      expect(mockIdentityApi.launchWebAuthFlow).not.toBeCalled();
+    });
+
+    test("authorization flow", async () => {
+      const client = new Oauth2Client({
+        ...clientOptions,
+        accessTokenUrl: ACCESS_TOKEN_URL,
+      });
+
+      mockStorageArea.get.mockResolvedValueOnce({});
+
+      mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+        `http://example.com#code=${AUTH_CODE}`
+      );
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: ACCESS_TOKEN,
+            expires_in: ACCESS_TOKEN_LIFETIME,
+            refresh_token: REFRESH_TOKEN,
+          })
+        )
+      );
+
+      const token = await client.getAccessToken();
+      expect(token).toBe(ACCESS_TOKEN);
+
+      const webAuthUrl = new URL(WEB_AUTH_FLOW_URL);
+      webAuthUrl.searchParams.set("client_id", CLIENT_ID);
+      webAuthUrl.searchParams.set("prompt", prompt);
+      webAuthUrl.searchParams.set("redirect_uri", REDIRECT_URL);
+      webAuthUrl.searchParams.set("scope", SCOPES_STRING);
+      if (pkceMethod) {
+        webAuthUrl.searchParams.set(
+          "code_challenge",
+          pkceMethod === "S256" ? CODE_CHALLENGE : CODE_VERIFIER
+        );
+        webAuthUrl.searchParams.set("code_challenge_method", pkceMethod);
+      }
+      webAuthUrl.searchParams.set("response_mode", "fragment");
+      webAuthUrl.searchParams.set("response_type", "code");
+      expect(mockIdentityApi.launchWebAuthFlow).toHaveBeenCalledWith({
+        url: webAuthUrl.toString(),
+        interactive,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(ACCESS_TOKEN_URL, {
+        method: "post",
+        body: expect.any(URLSearchParams),
+      });
+
+      const fetchBody: URLSearchParams = fetchSpy.mock.calls[0][1].body;
+      expect(Object.fromEntries(fetchBody.entries())).toEqual({
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URL,
+        scope: SCOPES_STRING,
+        grant_type: "authorization_code",
+        code: AUTH_CODE,
+        code_verifier: pkceMethod ? CODE_VERIFIER : undefined,
+        client_secret: clientSecretForTesting,
+      });
+
+      const storedValue = JSON.parse(
+        mockStorageArea.set.mock.calls[0][0][storageKey]
+      );
+      expect(storedValue).toEqual({
+        webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+        clientId: CLIENT_ID,
+        scope: SCOPES_STRING,
+        expiration: EXPIRATION_TIME,
+        accessToken: ACCESS_TOKEN,
         refreshToken: REFRESH_TOKEN,
-      }),
-    });
-    fetchSpy.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          access_token: ACCESS_TOKEN,
-          expires_in: ACCESS_TOKEN_LIFETIME,
-          refresh_token: REFRESH_TOKEN,
-        })
-      )
-    );
-
-    const token = await client.getAccessToken();
-    expect(token).toBe(ACCESS_TOKEN);
-
-    expect(mockIdentityApi.launchWebAuthFlow).not.toHaveBeenCalled();
-
-    expect(fetchSpy).toHaveBeenCalledWith(ACCESS_TOKEN_URL, {
-      method: "post",
-      body: expect.any(URLSearchParams),
-    });
-    const fetchBody: URLSearchParams = fetchSpy.mock.calls[0][1].body;
-    expect(Object.fromEntries(fetchBody.entries())).toEqual({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URL,
-      scope: SCOPES_STRING,
-      grant_type: "refresh_token",
-      refresh_token: REFRESH_TOKEN,
+        accessTokenUrl: ACCESS_TOKEN_URL,
+        pkceMethod,
+      });
     });
 
-    const storedValue = JSON.parse(
-      mockStorageArea.set.mock.calls[0][0][storageKey]
-    );
-    expect(storedValue).toEqual({
-      webAuthFlowUrl: WEB_AUTH_FLOW_URL,
-      clientId: CLIENT_ID,
-      scope: SCOPES_STRING,
-      expiration: EXPIRATION_TIME + 1 + 1000 * ACCESS_TOKEN_LIFETIME,
-      accessToken: ACCESS_TOKEN,
-      refreshToken: REFRESH_TOKEN,
-      accessTokenUrl: ACCESS_TOKEN_URL,
-      pkceMethod,
+    test("authorization flow with refresh token", async () => {
+      const client = new Oauth2Client({
+        ...clientOptions,
+        accessTokenUrl: ACCESS_TOKEN_URL,
+      });
+
+      jest.setSystemTime(EXPIRATION_TIME + 1);
+
+      mockStorageArea.get.mockResolvedValueOnce({
+        [storageKey]: JSON.stringify({
+          webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+          clientId: CLIENT_ID,
+          scope: SCOPES_STRING,
+          expiration: EXPIRATION_TIME,
+          accessTokenUrl: ACCESS_TOKEN_URL,
+          accessToken: ACCESS_TOKEN,
+          pkceMethod,
+          refreshToken: REFRESH_TOKEN,
+        }),
+      });
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: ACCESS_TOKEN,
+            expires_in: ACCESS_TOKEN_LIFETIME,
+            refresh_token: REFRESH_TOKEN,
+          })
+        )
+      );
+
+      const token = await client.getAccessToken();
+      expect(token).toBe(ACCESS_TOKEN);
+
+      expect(mockIdentityApi.launchWebAuthFlow).not.toHaveBeenCalled();
+
+      expect(fetchSpy).toHaveBeenCalledWith(ACCESS_TOKEN_URL, {
+        method: "post",
+        body: expect.any(URLSearchParams),
+      });
+
+      const fetchBody: URLSearchParams = fetchSpy.mock.calls[0][1].body;
+      expect(Object.fromEntries(fetchBody.entries())).toEqual({
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URL,
+        scope: SCOPES_STRING,
+        grant_type: "refresh_token",
+        refresh_token: REFRESH_TOKEN,
+        client_secret: clientSecretForTesting,
+      });
+
+      const storedValue = JSON.parse(
+        mockStorageArea.set.mock.calls[0][0][storageKey]
+      );
+      expect(storedValue).toEqual({
+        webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+        clientId: CLIENT_ID,
+        scope: SCOPES_STRING,
+        expiration: EXPIRATION_TIME + 1 + 1000 * ACCESS_TOKEN_LIFETIME,
+        accessToken: ACCESS_TOKEN,
+        refreshToken: REFRESH_TOKEN,
+        accessTokenUrl: ACCESS_TOKEN_URL,
+        pkceMethod,
+      });
     });
-  });
-});
+  }
+);
