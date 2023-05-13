@@ -1,14 +1,8 @@
-import {
-  DEFAULT_CODE_CHALLENGE_METHOD,
-  DEFAULT_PROMPT,
-  DEFAULT_STORAGE_KEY_PREFIX,
-  IdentityApi,
-  Oauth2Client,
-  Oauth2ClientOptions,
-  CodeChallengeMethod,
-  StorageArea,
-  Oauth2ServerError,
-} from "../src";
+import { Oauth2Client } from "../src/Oauth2Client";
+import { DEFAULT_CODE_CHALLENGE_METHOD, DEFAULT_PROMPT, DEFAULT_STORAGE_KEY_PREFIX, Oauth2ClientOptions } from "../src/Oauth2ClientOptions";
+import { Oauth2ServerError } from "../src/Oauth2ServerError";
+import { CodeChallengeMethod, IdentityApi, StorageArea } from "../src/types";
+
 
 const START_TIME = 12345;
 const WEB_AUTH_FLOW_URL = "https://example.com/auth";
