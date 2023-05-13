@@ -1,8 +1,14 @@
+// eslint-disable-file @typescript-eslint/no-explicit-any
+
 import { Oauth2Client } from "../src/Oauth2Client";
-import { DEFAULT_CODE_CHALLENGE_METHOD, DEFAULT_PROMPT, DEFAULT_STORAGE_KEY_PREFIX, Oauth2ClientOptions } from "../src/Oauth2ClientOptions";
+import {
+  DEFAULT_CODE_CHALLENGE_METHOD,
+  DEFAULT_PROMPT,
+  DEFAULT_STORAGE_KEY_PREFIX,
+  Oauth2ClientOptions,
+} from "../src/Oauth2ClientOptions";
 import { Oauth2ServerError } from "../src/Oauth2ServerError";
 import { CodeChallengeMethod, IdentityApi, StorageArea } from "../src/types";
-
 
 const START_TIME = 12345;
 const WEB_AUTH_FLOW_URL = "https://example.com/auth";
@@ -25,6 +31,7 @@ const REQUEST_URL = "http://example.com/request";
 const ERROR_TYPE = "fake error";
 const ERROR_DESCRIPTION = "error description";
 const ERROR_URI = "errorUri";
+const MOCK_ERROR = "mock error";
 
 // A random 43-character string.
 const CODE_VERIFIER =
@@ -32,18 +39,15 @@ const CODE_VERIFIER =
 const CODE_CHALLENGE = "E8aioJOUQj4zrNlWae0RNngd1l_xffNrHj2-eFiFnk8";
 
 const mockStorageArea = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  set: jest.fn<Promise<void>, [Record<string, any>]>(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  get: jest.fn<Promise<Record<string, any>>, [string]>(),
-  remove: jest.fn<Promise<void>, [string]>(),
+  set: jest.fn().mockResolvedValue(undefined),
+  get: jest.fn().mockImplementation(() => {
+    return {};
+  }),
+  remove: jest.fn().mockResolvedValue(undefined),
 } satisfies StorageArea;
 
 const mockIdentityApi = {
-  launchWebAuthFlow: jest.fn<
-    Promise<string>,
-    [chrome.identity.WebAuthFlowOptions]
-  >(),
+  launchWebAuthFlow: jest.fn(),
   getRedirectURL(): string {
     return REDIRECT_URL;
   },
@@ -65,15 +69,66 @@ interface EffectiveOptions {
   codeChallengeMethod?: CodeChallengeMethod | undefined;
 }
 
-function callIf<A extends unknown[], F extends (...args: A) => void>(
-  condition: unknown,
-  f: F,
-  ...args: A
-): void {
-  if (condition) {
-    return f(...args);
-  }
-}
+// Install fake chrome functions.
+global.chrome = {
+  storage: {
+    local: mockStorageArea,
+  },
+  identity: mockIdentityApi,
+  runtime: {
+    lastError: undefined,
+  },
+} as unknown as typeof chrome;
+
+describe("Oauth2Client constructor errors", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("accessTokenUrl without codeChallengeMethod", () => {
+    const warnSpy = jest.spyOn(console, "warn");
+    new Oauth2Client({
+      ...COMMON_CLIENT_OPTIONS,
+      codeChallengeMethod: "plain",
+    });
+    expect(warnSpy).toBeCalledWith(
+      "codeChallengeMethod is ignored without accessTokenUrl"
+    );
+  });
+
+  test("codeVerifierLength", () => {
+    new Oauth2Client({ ...COMMON_CLIENT_OPTIONS, codeVerifierLength: 43 });
+    new Oauth2Client({ ...COMMON_CLIENT_OPTIONS, codeVerifierLength: 128 });
+    expect(
+      () =>
+        new Oauth2Client({ ...COMMON_CLIENT_OPTIONS, codeVerifierLength: 42 })
+    ).toThrow(Error);
+    expect(
+      () =>
+        new Oauth2Client({ ...COMMON_CLIENT_OPTIONS, codeVerifierLength: 129 })
+    ).toThrow(Error);
+  });
+
+  test("no codeVerifierLength with null codeChallengeMethod", () => {
+    expect(
+      () =>
+        new Oauth2Client({
+          ...COMMON_CLIENT_OPTIONS,
+          codeChallengeMethod: null,
+          codeVerifierLength: 43,
+        })
+    ).toThrow(Error);
+  });
+
+  test("dummy for code coverage", () => {
+    new Oauth2Client({
+      ...COMMON_CLIENT_OPTIONS,
+      storageArea: undefined,
+      identityApi: undefined,
+      minSecondsToExpiration: 1,
+    });
+  });
+});
 
 describe.each([
   ["defaults", {}, {}],
@@ -136,18 +191,19 @@ describe.each([
 
     beforeEach(() => {
       jest.useFakeTimers({ now: START_TIME });
-      mockStorageArea.get.mockClear();
-      mockStorageArea.set.mockClear();
-      mockStorageArea.remove.mockClear();
-      mockIdentityApi.launchWebAuthFlow.mockClear();
-      fetchSpy = jest.spyOn(global, "fetch").mockImplementation(() => {
-        throw Error("not implemented");
-      });
+      fetchSpy = jest.spyOn(global, "fetch").mockReturnValue(null);
+      mockStorageArea.set.mockResolvedValue(undefined),
+        mockStorageArea.get.mockImplementation(() => {
+          return {};
+        }),
+        mockStorageArea.remove.mockResolvedValue(undefined),
+        mockIdentityApi.launchWebAuthFlow.mockRejectedValue(
+          Error("not implemented in test")
+        );
     });
 
     afterEach(() => {
       jest.useRealTimers();
-      jest.clearAllMocks();
       jest.restoreAllMocks();
     });
 
@@ -173,26 +229,40 @@ describe.each([
       expect(mockIdentityApi.launchWebAuthFlow).not.toBeCalled();
     });
 
-    test("fetch", async () => {
-      fetchSpy.mockResolvedValue(null);
-      const client = new Oauth2Client(clientOptions);
-      const clientSpy = jest.spyOn(client, "getAccessToken");
-      clientSpy.mockResolvedValueOnce({ token: ACCESS_TOKEN });
+    describe("fetch", () => {
+      const DUMMY_HEADER = "dummy value";
+      let client: Oauth2Client;
 
-      const dummyHeader = "dummy value";
-      await client.fetch(REQUEST_URL, { headers: { dummyHeader } });
+      beforeEach(() => {
+        client = new Oauth2Client(clientOptions);
+        jest
+          .spyOn(client, "getAccessToken")
+          .mockResolvedValueOnce({ token: ACCESS_TOKEN });
+      });
 
-      const calls = fetchSpy.mock.calls;
-      expect(calls.length).toBe(1);
+      test("1 arg", async () => {
+        await client.fetch(
+          new Request(REQUEST_URL, { headers: { DUMMY_HEADER } })
+        );
+      });
 
-      expect(calls[0][0].url).toBe(REQUEST_URL);
-      expect(calls[0][0].headers.get("dummyHeader")).toBe(dummyHeader);
-      expect(calls[0][0].headers.get("Authorization")).toBe(
-        "Bearer " + ACCESS_TOKEN
-      );
+      test("2 args", async () => {
+        await client.fetch(REQUEST_URL, { headers: { DUMMY_HEADER } });
+      });
+
+      afterEach(() => {
+        const calls = fetchSpy.mock.calls;
+        expect(calls.length).toBe(1);
+
+        expect(calls[0][0].url).toBe(REQUEST_URL);
+        expect(calls[0][0].headers.get("DUMMY_HEADER")).toBe(DUMMY_HEADER);
+        expect(calls[0][0].headers.get("Authorization")).toBe(
+          "Bearer " + ACCESS_TOKEN
+        );
+      });
     });
 
-    test("remove", async () => {
+    test("clearSavedData", async () => {
       const client = new Oauth2Client(clientOptions);
       await client.clearSavedData();
 
@@ -200,11 +270,45 @@ describe.each([
       expect(mockStorageArea.remove).toBeCalledWith(storageKey);
     });
 
-    callIf(!accessTokenUrl, describe, "implicit flow", () => {
-      test("initial grant", async () => {
-        const client = new Oauth2Client(clientOptions);
+    test.each`
+      lastError
+      ${undefined}
+      ${{ message: "" }}
+      ${{ message: MOCK_ERROR }}
+    `("launchWebAuthFlow returns undefined with lastError == $lastError", async ({ lastError }) => {
+      const client = new Oauth2Client(clientOptions);
 
-        mockStorageArea.get.mockResolvedValueOnce({});
+      mockIdentityApi.launchWebAuthFlow.mockImplementationOnce(() => {
+        chrome.runtime.lastError = lastError;
+        return undefined;
+      });
+
+      await expect(() => client.getAccessToken()).rejects.toThrow(
+        lastError?.message || Error
+      );
+    });
+
+    test.each`
+      params                                   | condition          | missing
+      ${`access_token=${ACCESS_TOKEN}`}        | ${!accessTokenUrl} | ${"expires_in"}
+      ${`expires_in=${ACCESS_TOKEN_LIFETIME}`} | ${!accessTokenUrl} | ${"access_token"}
+      ${""}                                    | ${accessTokenUrl}  | ${"code"}
+    `(
+      "launchWebAuthFlow response is missing $missing",
+      async ({ params, condition, missing }) => {
+        if (condition) {
+          const client = new Oauth2Client(clientOptions);
+          mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+            "http://example.com#" + params
+          );
+          await expect(() => client.getAccessToken()).rejects.toThrow(new RegExp(missing));
+        }
+      }
+    );
+
+    if (!accessTokenUrl) {
+      test("implicit flow initial grant", async () => {
+        const client = new Oauth2Client(clientOptions);
 
         mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
           `http://example.com#access_token=${ACCESS_TOKEN}&expires_in=${ACCESS_TOKEN_LIFETIME}`
@@ -239,7 +343,79 @@ describe.each([
         });
       });
 
-      test("expired token", async () => {
+      test("implicit flow initial grant", async () => {
+        const client = new Oauth2Client(clientOptions);
+
+        mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+          `http://example.com#access_token=${ACCESS_TOKEN}&expires_in=${ACCESS_TOKEN_LIFETIME}`
+        );
+
+        const { token } = await client.getAccessToken();
+        expect(token).toBe(ACCESS_TOKEN);
+
+        const webAuthUrl = new URL(WEB_AUTH_FLOW_URL);
+        webAuthUrl.searchParams.set("client_id", CLIENT_ID);
+        webAuthUrl.searchParams.set("prompt", prompt);
+        webAuthUrl.searchParams.set("redirect_uri", REDIRECT_URL);
+        webAuthUrl.searchParams.set("scope", SCOPES_STRING);
+        webAuthUrl.searchParams.set("nonce", NONCE);
+        webAuthUrl.searchParams.set("response_mode", "fragment");
+        webAuthUrl.searchParams.set("response_type", "token");
+        expect(mockIdentityApi.launchWebAuthFlow).toHaveBeenCalledWith({
+          url: webAuthUrl.toString(),
+          interactive,
+        });
+
+        const storedValue = JSON.parse(
+          mockStorageArea.set.mock.calls[0][0][storageKey]
+        );
+        expect(storedValue).toEqual({
+          webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+          clientId: CLIENT_ID,
+          scope: SCOPES_STRING,
+          expiration: EXPIRATION_TIME,
+          accessToken: ACCESS_TOKEN,
+          codeChallengeMethod,
+        });
+      });
+
+      test("launchWebAuthFlow fails to return access token", async () => {
+        const client = new Oauth2Client(clientOptions);
+
+        mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+          `http://example.com#access_token=${ACCESS_TOKEN}&expires_in=${ACCESS_TOKEN_LIFETIME}`
+        );
+
+        const { token } = await client.getAccessToken();
+        expect(token).toBe(ACCESS_TOKEN);
+
+        const webAuthUrl = new URL(WEB_AUTH_FLOW_URL);
+        webAuthUrl.searchParams.set("client_id", CLIENT_ID);
+        webAuthUrl.searchParams.set("prompt", prompt);
+        webAuthUrl.searchParams.set("redirect_uri", REDIRECT_URL);
+        webAuthUrl.searchParams.set("scope", SCOPES_STRING);
+        webAuthUrl.searchParams.set("nonce", NONCE);
+        webAuthUrl.searchParams.set("response_mode", "fragment");
+        webAuthUrl.searchParams.set("response_type", "token");
+        expect(mockIdentityApi.launchWebAuthFlow).toHaveBeenCalledWith({
+          url: webAuthUrl.toString(),
+          interactive,
+        });
+
+        const storedValue = JSON.parse(
+          mockStorageArea.set.mock.calls[0][0][storageKey]
+        );
+        expect(storedValue).toEqual({
+          webAuthFlowUrl: WEB_AUTH_FLOW_URL,
+          clientId: CLIENT_ID,
+          scope: SCOPES_STRING,
+          expiration: EXPIRATION_TIME,
+          accessToken: ACCESS_TOKEN,
+          codeChallengeMethod,
+        });
+      });
+
+      test("implicit flow with expired token", async () => {
         const client = new Oauth2Client(clientOptions);
 
         mockStorageArea.get.mockResolvedValueOnce({
@@ -273,13 +449,11 @@ describe.each([
           codeChallengeMethod,
         });
       });
-    });
+    }
 
-    callIf(accessTokenUrl, describe, "authorization flow", () => {
-      test("initial grant", async () => {
+    if (accessTokenUrl) {
+      test("auth flow initial grant", async () => {
         const client = new Oauth2Client(clientOptions);
-
-        mockStorageArea.get.mockResolvedValueOnce({});
 
         mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
           `http://example.com#code=${AUTH_CODE}`
@@ -416,8 +590,6 @@ describe.each([
       test("error response from fetch", async () => {
         const client = new Oauth2Client(clientOptions);
 
-        mockStorageArea.get.mockResolvedValueOnce({});
-
         mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
           `http://example.com#code=${AUTH_CODE}`
         );
@@ -445,12 +617,48 @@ describe.each([
           }
         }
       });
-    });
+
+
+      test.each`
+        status 
+        ${404}
+        ${500}
+      `("fetch returns HTTP error $status", async ({ status }) => {
+        const client = new Oauth2Client(clientOptions);
+        mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+          `http://example.com#code=${AUTH_CODE}`
+        );
+        fetchSpy.mockResolvedValueOnce(
+          new Response("", {status})
+        );
+        await expect(() => client.getAccessToken()).rejects.toThrow(new RegExp(String(status)));
+      });
+
+      test.each`
+        missingField       | error
+        ${"access_token"}  | ${/access_token/}
+        ${"expires_in"}    | ${/expires_in/}
+        ${"refresh_token"} | ${/refresh_token/}
+      `("fetch result is missing $missingField", async ({ missingField, error }) => {
+        const client = new Oauth2Client(clientOptions);
+        mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+          `http://example.com#code=${AUTH_CODE}`
+        );
+        const responseFields = {
+          access_token: ACCESS_TOKEN,
+          expires_in: ACCESS_TOKEN_LIFETIME,
+          refresh_token: REFRESH_TOKEN,
+        };
+        delete responseFields[missingField];
+        fetchSpy.mockResolvedValueOnce(
+          new Response(JSON.stringify(responseFields))
+        );
+        await expect(() => client.getAccessToken()).rejects.toThrow(error);
+      });
+    }
 
     test("error response from launchWebAuthFlow", async () => {
       const client = new Oauth2Client(clientOptions);
-
-      mockStorageArea.get.mockResolvedValueOnce({});
 
       mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
         "http://example.com#" +

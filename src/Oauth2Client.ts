@@ -6,8 +6,9 @@ import {
   Oauth2ClientOptions,
 } from "./Oauth2ClientOptions";
 import { Oauth2ServerError } from "./Oauth2ServerError";
-import { randomString } from "./randomString";
 import { CodeChallengeMethod, IdentityApi, StorageArea } from "./types";
+import { randomString } from "./util";
+import assert from "tiny-invariant";
 
 function maybeThrowOauth2Error(params: URLSearchParams): void {
   const error = params.get("error");
@@ -15,11 +16,7 @@ function maybeThrowOauth2Error(params: URLSearchParams): void {
   const uri = params.get("error_uri") ?? undefined;
 
   if (typeof error === "string") {
-    throw new Oauth2ServerError(
-      error,
-      description,
-      uri
-    );
+    throw new Oauth2ServerError(error, description, uri);
   }
 }
 
@@ -193,7 +190,7 @@ export class Oauth2Client {
   #initSearchParams(
     params: URLSearchParams,
     includePrompt: boolean,
-    extraValues: Record<string, string | undefined> = {}
+    extraValues: Record<string, string | undefined>
   ): void {
     params.set("client_id", this.#clientId);
     if (includePrompt) {
@@ -222,9 +219,7 @@ export class Oauth2Client {
       interactive: this.#prompt !== "none",
     });
 
-    if (!identityResponse) {
-      throw Error("empty response from identity API");
-    }
+    checkIdentityResponse(identityResponse);
 
     const identityParams = new URL(identityResponse.replace("#", "?"))
       .searchParams;
@@ -289,9 +284,7 @@ export class Oauth2Client {
       interactive: this.#prompt !== "none",
     });
 
-    if (!identityResponse) {
-      throw Error("empty response from identity API");
-    }
+    checkIdentityResponse(identityResponse);
 
     const identityParams = new URL(identityResponse.replace("#", "?"))
       .searchParams;
@@ -308,9 +301,7 @@ export class Oauth2Client {
   async #fetchAccessTokenByGrant(
     refreshToken: string | undefined
   ): Promise<string> {
-    if (!this.#accessTokenUrl) {
-      throw Error("missing or invalid accessTokenUrl");
-    }
+    assert(this.#accessTokenUrl);
 
     const body = new URLSearchParams();
     let extraParams: Record<string, string>;
@@ -336,33 +327,33 @@ export class Oauth2Client {
       body,
     });
 
-    console.log("status:", resp.status);
-    const data = await resp.json();
 
     if (resp.status === 400) {
-      console.log(new URLSearchParams(data));
+      const data = await resp.json();
       maybeThrowOauth2Error(new URLSearchParams(data));
     }
 
     if (!resp.ok) {
       throw Error(
-        `error getting tokens from code: ${resp.status}: ${JSON.stringify(
-          data
-        )}`
+        `error getting tokens from code: ${resp.status}: ${await resp.text()}`
       );
     }
 
-    const { access_token: accessToken, refresh_token: newRefreshToken } = data;
+    const data = await resp.json();
+    const { access_token: accessToken, refresh_token: newRefreshToken, expires_in: expiresIn } = data;
 
     if (!accessToken) {
       throw Error("missing access_token in response: " + JSON.stringify(data));
+    }
+    if (!expiresIn) {
+      throw Error("missing expires_in in response: " + JSON.stringify(data));
     }
     if (!newRefreshToken && !refreshToken) {
       throw Error("missing refresh_token in response: " + JSON.stringify(data));
     }
 
     await this.#storeRecord({
-      expiration: Date.now() + 1000 * data.expires_in,
+      expiration: Date.now() + 1000 * expiresIn,
       accessToken,
       refreshToken: newRefreshToken || refreshToken,
     });
@@ -370,3 +361,10 @@ export class Oauth2Client {
     return accessToken;
   }
 }
+
+function checkIdentityResponse(identityResponse: string) {
+  if (!identityResponse || typeof identityResponse !== "string") {
+    throw Error(global.chrome?.runtime?.lastError?.message || "empty response from identity API");
+  }
+}
+

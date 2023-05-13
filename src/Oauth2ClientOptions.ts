@@ -28,7 +28,8 @@ export interface Oauth2ClientOptions {
   scopes: string | Iterable<string>;
 
   /**
-   * The "prompt" parameter passed to the web auth flow URL.  Defaults to "none".
+   * The "prompt" parameter passed to the web auth flow URL.  Defaults to
+   * {@link DEFAULT_PROMPT}.
    */
   prompt?: PromptType;
 
@@ -48,14 +49,14 @@ export interface Oauth2ClientOptions {
 
   /**
    * The code challenge method used for PKCE.  Defaults to
-   * {@link DEFAULT_CODE_CHALLENGE_METHOD} (S256).  Only relevant when
+   * {@link DEFAULT_CODE_CHALLENGE_METHOD}.  Only relevant when
    * {@link accessTokenUrl} is set.  Set to null to disable PKCE if necessary.
    */
   codeChallengeMethod?: CodeChallengeMethod | null;
 
   /**
    * The length of the code verifier string used for PKCE.  Must be between 43
-   * and 128.  Defaults to {@link DEFAULT_CODE_VERIFIER_LENGTH} (43).
+   * and 128.  Defaults to {@link DEFAULT_CODE_VERIFIER_LENGTH}.
    */
   codeVerifierLength?: number;
 
@@ -83,7 +84,7 @@ export interface Oauth2ClientOptions {
    * If a token is close to its expiration time, it is treated as expired.  This
    * parameter controls how many more seconds a token should be valid before it
    * is considered expired.  Defaults to
-   * {@link DEFAULT_MIN_SECONDS_TO_EXPIRATION} (60).
+   * {@link DEFAULT_MIN_SECONDS_TO_EXPIRATION}.
    */
   minSecondsToExpiration?: number;
 
