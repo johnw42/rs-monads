@@ -39,7 +39,7 @@ export class Oauth2ServerError extends Error {
      * The specific error type reported by the OAuth server.  This could be a
      * value defined in the OAuth 2.0 spec or a vendor extension.
      */
-    readonly errorType: string,
+    readonly type: string,
 
     /**
      * The error_description, if any, reported by the server.
@@ -52,36 +52,22 @@ export class Oauth2ServerError extends Error {
     readonly uri?: string
   ) {
     super(
-      errorType +
-        (description ? ": " + description : "") +
-        (uri ? `(${uri})` : "")
+      type + (description ? ": " + description : "") + (uri ? ` (${uri})` : "")
     );
   }
 }
 
-function maybeThrowOauth2Error(
-  params: URLSearchParams | ReturnType<typeof JSON.parse>
-): void {
-  let error: string | undefined | null;
-  let description: string | undefined | null;
-  let uri: string | undefined | null;
-
-  if (params instanceof URLSearchParams) {
-    error = params.get("error");
-    description = params.get("error_description");
-    uri = params.get("error_uri");
-  } else if (params && typeof params.error === "string") {
-    error = params.error;
-    if (typeof params.error_description === "string") {
-      description = params.error_description;
-    }
-    if (typeof params.error_uri === "string") {
-      uri = params.error_uri;
-    }
-  }
+function maybeThrowOauth2Error(params: URLSearchParams): void {
+  const error = params.get("error");
+  const description = params.get("error_description");
+  const uri = params.get("error_uri");
 
   if (typeof error === "string") {
-    throw new Oauth2ServerError(error, description, uri);
+    throw new Oauth2ServerError(
+      error,
+      description ?? undefined,
+      uri ?? undefined
+    );
   }
 }
 
@@ -214,7 +200,7 @@ export interface Oauth2ClientOptions {
   /**
    * If set, specifies a fixed string to use to PCKE verification.  Use only for
    * testing!
-   * 
+   *
    * @deprecated
    */
   codeVerifierForTesting?: string;
@@ -222,7 +208,7 @@ export interface Oauth2ClientOptions {
   /**
    * If set, specifies a fix string to use as a nonce for the implicit grant
    * flow.  Use only for testing!
-   * 
+   *
    * @deprecated
    */
   nonceForTesting?: string;
@@ -519,14 +505,19 @@ export class Oauth2Client {
       body,
     });
 
-    if (!resp.ok) {
-      throw Error(
-        `error getting tokens from code: ${resp.status}: ${await resp.text()}`
-      );
+    console.log("status:", resp.status);
+    const data = await resp.json();
+
+    if (resp.status === 400) {
+      console.log(new URLSearchParams(data));
+      maybeThrowOauth2Error(new URLSearchParams(data));
     }
 
-    const data = await resp.json();
-    maybeThrowOauth2Error(data);
+    if (!resp.ok) {
+      throw Error(
+        `error getting tokens from code: ${resp.status}: ${JSON.stringify(data)}`
+      );
+    }
 
     const { access_token: accessToken, refresh_token: newRefreshToken } = data;
 

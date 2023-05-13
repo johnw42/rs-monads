@@ -7,6 +7,7 @@ import {
   Oauth2ClientOptions,
   CodeChallengeMethod,
   StorageArea,
+  Oauth2ServerError,
 } from "../src";
 
 const START_TIME = 12345;
@@ -27,6 +28,9 @@ const REFRESH_TOKEN = "fake refresh token";
 const NONCE = "fake nonce";
 const CLIENT_SECRET = "fake client secret";
 const REQUEST_URL = "http://example.com/request";
+const ERROR_TYPE = "fake error";
+const ERROR_DESCRIPTION = "error description";
+const ERROR_URI = "errorUri";
 
 // A random 43-character string.
 const CODE_VERIFIER =
@@ -67,12 +71,21 @@ interface EffectiveOptions {
   codeChallengeMethod?: CodeChallengeMethod | undefined;
 }
 
+function callIf<A extends unknown[], F extends (...args: A) => void>(
+  condition: unknown,
+  f: F,
+  ...args: A
+): void {
+  if (condition) {
+    return f(...args);
+  }
+}
+
 describe.each([
-  ["defaults", COMMON_CLIENT_OPTIONS, {}],
+  ["defaults", {}, {}],
   [
     "overrides",
     {
-      ...COMMON_CLIENT_OPTIONS,
       scopes: SCOPES_STRING,
       storageKey: CUSTOM_STORAGE_KEY,
       prompt: "login",
@@ -82,7 +95,6 @@ describe.each([
   [
     "accessTokenUrl",
     {
-      ...COMMON_CLIENT_OPTIONS,
       accessTokenUrl: ACCESS_TOKEN_URL,
     },
     {},
@@ -90,7 +102,6 @@ describe.each([
   [
     "accessTokenUrl and plaintext challenge",
     {
-      ...COMMON_CLIENT_OPTIONS,
       accessTokenUrl: ACCESS_TOKEN_URL,
       codeChallengeMethod: "plain",
       clientSecretForTesting: CLIENT_SECRET,
@@ -100,19 +111,22 @@ describe.each([
   [
     "accessTokenUrl and no PKCE",
     {
-      ...COMMON_CLIENT_OPTIONS,
       accessTokenUrl: ACCESS_TOKEN_URL,
       codeChallengeMethod: null,
     },
     { codeChallengeMethod: undefined },
   ],
-] satisfies [string, Oauth2ClientOptions, EffectiveOptions][])(
+] satisfies [string, Partial<Oauth2ClientOptions>, EffectiveOptions][])(
   "Oauth2Client with %s",
   (
     _,
-    clientOptions: Oauth2ClientOptions,
+    extraClientOptions: Partial<Oauth2ClientOptions>,
     effectiveOptions: EffectiveOptions
   ) => {
+    const clientOptions: Oauth2ClientOptions = {
+      ...COMMON_CLIENT_OPTIONS,
+      ...extraClientOptions,
+    };
     const { prompt, storageKey, clientSecretForTesting, accessTokenUrl } = {
       prompt: DEFAULT_PROMPT,
       storageKey: DEFAULT_STORAGE_KEY,
@@ -192,8 +206,8 @@ describe.each([
       expect(mockStorageArea.remove).toBeCalledWith(storageKey);
     });
 
-    if (!accessTokenUrl) {
-      test("implicit flow", async () => {
+    callIf(!accessTokenUrl, describe, "implicit flow", () => {
+      test("initial grant", async () => {
         const client = new Oauth2Client(clientOptions);
 
         mockStorageArea.get.mockResolvedValueOnce({});
@@ -231,7 +245,7 @@ describe.each([
         });
       });
 
-      test("implicit flow with expired token", async () => {
+      test("expired token", async () => {
         const client = new Oauth2Client(clientOptions);
 
         mockStorageArea.get.mockResolvedValueOnce({
@@ -265,14 +279,11 @@ describe.each([
           codeChallengeMethod,
         });
       });
-    }
+    });
 
-    if (accessTokenUrl) {
-      test("authorization flow", async () => {
-        const client = new Oauth2Client({
-          ...clientOptions,
-          accessTokenUrl: ACCESS_TOKEN_URL,
-        });
+    callIf(accessTokenUrl, describe, "authorization flow", () => {
+      test("initial grant", async () => {
+        const client = new Oauth2Client(clientOptions);
 
         mockStorageArea.get.mockResolvedValueOnce({});
 
@@ -345,11 +356,8 @@ describe.each([
         });
       });
 
-      test("authorization flow with refresh token", async () => {
-        const client = new Oauth2Client({
-          ...clientOptions,
-          accessTokenUrl: ACCESS_TOKEN_URL,
-        });
+      test("refresh grant", async () => {
+        const client = new Oauth2Client(clientOptions);
 
         jest.setSystemTime(EXPIRATION_TIME + 1);
 
@@ -410,6 +418,67 @@ describe.each([
           codeChallengeMethod,
         });
       });
-    }
+
+      test("error response from fetch", async () => {
+        const client = new Oauth2Client(clientOptions);
+
+        mockStorageArea.get.mockResolvedValueOnce({});
+
+        mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+          `http://example.com#code=${AUTH_CODE}`
+        );
+        fetchSpy.mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              error: ERROR_TYPE,
+              error_description: ERROR_DESCRIPTION,
+              error_uri: ERROR_URI,
+            }),
+            { status: 400 }
+          )
+        );
+
+        try {
+          await client.getAccessToken();
+          expect(true).toBe(false);
+        } catch (error) {
+          if (error instanceof Oauth2ServerError) {
+            expect(error.type).toBe(ERROR_TYPE);
+            expect(error.description).toBe(ERROR_DESCRIPTION);
+            expect(error.uri).toBe(ERROR_URI);
+          } else {
+            throw error;
+          }
+        }
+      });
+    });
+
+    test("error response from launchWebAuthFlow", async () => {
+      const client = new Oauth2Client(clientOptions);
+
+      mockStorageArea.get.mockResolvedValueOnce({});
+
+      mockIdentityApi.launchWebAuthFlow.mockResolvedValueOnce(
+        "http://example.com#" +
+          new URLSearchParams({
+            error: ERROR_TYPE,
+            error_description: ERROR_DESCRIPTION,
+            error_uri: ERROR_URI,
+          }).toString()
+      );
+
+      try {
+        await client.getAccessToken();
+        expect(true).toBe(false);
+      } catch (error) {
+        if (error instanceof Oauth2ServerError) {
+          expect(error.type).toBe(ERROR_TYPE);
+          expect(error.description).toBe(ERROR_DESCRIPTION);
+          expect(error.uri).toBe(ERROR_URI);
+        } else {
+          throw error;
+        }
+      }
+    });
   }
 );
