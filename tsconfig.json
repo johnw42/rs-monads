@@ -1,31 +1,14 @@
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
+    "noImplicitAny": true,
+    "module": "es6",
+    "target": "es5",
+    "allowJs": true,
     "declaration": true,
-    "declarationDir": "lib/types",
-    "esModuleInterop": true,
-    "importHelpers": true,
-    "lib": ["es2022", "dom"],
-    "module": "ES2020",
-    "moduleResolution": "Node",
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": false,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "lib": ["ES2015"],
     "outDir": "lib",
-    "paths": {
-      "*": ["*"]
-    },
-    "resolveJsonModule": true,
-    "sourceMap": true,
-    "strict": true,
-    "strictNullChecks": false,
-    "target": "ESNext"
+    "sourceMap": true
   },
-  "include": ["src/**/*.ts"],
-  "types": ["chrome", "jest"],
-  "typeRoots": ["../node_modules/@types"]
+  "include": ["src/**/*.ts"]
 }
