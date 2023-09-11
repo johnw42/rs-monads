@@ -190,7 +190,7 @@ export class None<T> implements IOption<T> {
   }
 
   unwrap(errorFactory?: () => unknown): never {
-    throw errorFactory ? errorFactory() : new Error("Missing Option value.");
+    throw (errorFactory ? errorFactory() : new Error("Missing Option value."));
   }
 
   unwrapOr<D>(defaultValue?: D): D | undefined {
@@ -241,12 +241,12 @@ export class None<T> implements IOption<T> {
     return other;
   }
 
-  orElse<R>(f: (value: T) => Option<R>): None<T> {
-    return _none();
+  orElse<R>(f: () => Option<R>): Option<R> {
+    return f();
   }
 
   xor<U>(other: Option<U>): Option<T> | Option<U> {
-    return other.isSome() ? this : other;
+    return other.isSome() ? other : this;
   }
 
   zip<U>(other: Option<U>): None<[T, U]> {

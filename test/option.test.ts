@@ -1,4 +1,4 @@
-import { isOption, none, opt, some } from "../src/Option";
+import { Option, isOption, none, opt, some } from "../src/Option";
 
 const anObject = { a: 0 };
 const anotherObject = { b: 1 };
@@ -77,15 +77,17 @@ describe("Some", () => {
   });
 
   test("unwrapOrElse", () => {
-    expect(some(anObject).unwrapOrElse(() => anotherObject)).toBe(anObject);
+    expect(some(anObject).unwrapOrElse(notCalled)).toBe(anObject);
   });
 
   test("map", () => {
     expect(
-      some(anObject).map((value) => {
-        expect(value).toBe(anObject);
-        return anotherObject;
-      }).unwrap(),
+      some(anObject)
+        .map((value) => {
+          expect(value).toBe(anObject);
+          return anotherObject;
+        })
+        .unwrap(),
     ).toBe(anotherObject);
   });
 
@@ -117,16 +119,20 @@ describe("Some", () => {
   });
 
   test("and", () => {
-    expect(some(anObject).and(some(anotherObject)).unwrap()).toBe(anotherObject);
+    expect(some(anObject).and(some(anotherObject)).unwrap()).toBe(
+      anotherObject,
+    );
     expect(some(anObject).and(none()).isNone()).toBe(true);
   });
 
   test("andThen", () => {
     expect(
-      some(anObject).andThen((value) => {
-        expect(value).toBe(anObject);
-        return some(anotherObject);
-      }).unwrap(),
+      some(anObject)
+        .andThen((value) => {
+          expect(value).toBe(anObject);
+          return some(anotherObject);
+        })
+        .unwrap(),
     ).toBe(anotherObject);
     expect(
       some(anObject)
@@ -158,19 +164,126 @@ describe("Some", () => {
   });
 
   test("zip", () => {
-    expect(some(anObject).zip(some(anotherObject)).unwrap()).toEqual([anObject, anotherObject]);
+    expect(some(anObject).zip(some(anotherObject)).unwrap()).toEqual([
+      anObject,
+      anotherObject,
+    ]);
     expect(some(anObject).zip(none()).isNone()).toBe(true);
   });
 
   test("zipWith", () => {
-    expect(some(anObject).zipWith(some(anotherObject), (a, b) => {
-      expect(a).toBe(anObject);
-      expect(b).toBe(anotherObject);
-      return thirdObject;
-    }).unwrap()).toBe(thirdObject);
+    expect(
+      some(anObject)
+        .zipWith(some(anotherObject), (a, b) => {
+          expect(a).toBe(anObject);
+          expect(b).toBe(anotherObject);
+          return thirdObject;
+        })
+        .unwrap(),
+    ).toBe(thirdObject);
   });
 
   test("join", () => {
     expect(some(some(anObject)).join().unwrap()).toBe(anObject);
+    expect(some(none()).join().isNone()).toBe(true);
+  });
+});
+
+describe("None", () => {
+  test("isSome", () => {
+    expect(none().isSome()).toBe(false);
+  });
+
+  test("isSomeAnd", () => {
+    expect(none().isSomeAnd(notCalled)).toBe(false);
+  });
+
+  test("isNone", () => {
+    expect(none().isNone()).toBe(true);
+  });
+
+  test("expect", () => {
+    expect(() => none().expect("xyzzy")).toThrow("xyzzy");
+    expect(() => none().expect(() => "xyzzy")).toThrow("xyzzy");
+  });
+
+  test("unwrap", () => {
+    expect(() => none().unwrap()).toThrow(Error);
+    expect(() => none().unwrap(() => new Error("xyzzy"))).toThrow("xyzzy");
+  });
+
+  test("unwrapOr", () => {
+    expect(none().unwrapOr(anotherObject)).toBe(anotherObject);
+  });
+
+  test("unwrapOrElse", () => {
+    expect(none().unwrapOrElse(() => anotherObject)).toBe(anotherObject);
+  });
+
+  test("map", () => {
+    expect(none().map(notCalled).isNone()).toBe(true);
+  });
+
+  test("mapOr", () => {
+    expect(none().mapOr(anotherObject, notCalled)).toBe(anotherObject);
+  });
+
+  test("mapOrElse", () => {
+    expect(none().mapOrElse(() => anotherObject, notCalled)).toBe(
+      anotherObject,
+    );
+  });
+
+  test("match", () => {
+    expect(none().match(notCalled, () => anotherObject)).toBe(anotherObject);
+  });
+
+  test("and", () => {
+    expect(none().and(some(anotherObject)).isNone()).toBe(true);
+    expect(none().and(none()).isNone()).toBe(true);
+  });
+
+  test("andThen", () => {
+    expect(none().andThen(notCalled).isNone()).toBe(true);
+  });
+
+  test("filter", () => {
+    expect(none().filter(notCalled).isNone()).toBe(true);
+  });
+
+  test("or", () => {
+    expect(none().or(some(anotherObject)).unwrap()).toBe(anotherObject);
+    expect(none().or(none()).isNone()).toBe(true);
+  });
+
+  test("orElse", () => {
+    expect(
+      none()
+        .orElse(() => some(anObject))
+        .unwrap(),
+    ).toBe(anObject);
+    expect(
+      none()
+        .orElse(() => none())
+        .isNone(),
+    ).toBe(true);
+  });
+
+  test("xor", () => {
+    expect(none().xor(some(anotherObject)).unwrap()).toBe(anotherObject);
+    expect(none().xor(none()).isNone()).toBe(true);
+  });
+
+  test("zip", () => {
+    expect(none().zip(some(anotherObject)).isNone()).toBe(true);
+    expect(none().zip(none()).isNone()).toBe(true);
+  });
+
+  test("zipWith", () => {
+    expect(none().zipWith(some(anotherObject), notCalled).isNone()).toBe(true);
+  });
+
+  test("join", () => {
+    expect(none<Option<unknown>>().join().isNone()).toBe(true);
   });
 });
