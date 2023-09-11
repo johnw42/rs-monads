@@ -64,12 +64,12 @@ describe("Some", () => {
 
   test("expect", () => {
     expect(some(anObject).expect("")).toBe(anObject);
-    expect(some(anObject).expect(() => "")).toBe(anObject);
+    expect(some(anObject).expect(notCalled)).toBe(anObject);
   });
 
   test("unwrap", () => {
     expect(some(anObject).unwrap()).toBe(anObject);
-    expect(some(anObject).unwrap(() => "")).toBe(anObject);
+    expect(some(anObject).unwrap(notCalled)).toBe(anObject);
   });
 
   test("unwrapOr", () => {
@@ -82,11 +82,11 @@ describe("Some", () => {
 
   test("okOr", () => {
     expect(some(anObject).okOr(anotherObject).unwrap()).toBe(anObject);
-  })
+  });
 
   test("okOrElse", () => {
     expect(some(anObject).okOrElse(notCalled).unwrap()).toBe(anObject);
-  })
+  });
 
   test("map", () => {
     expect(
@@ -117,6 +117,27 @@ describe("Some", () => {
     ).toBe(anotherObject);
   });
 
+  test("mapOpt", () => {
+    expect(
+      some(anObject)
+        .mapOpt((value) => {
+          expect(value).toBe(anObject);
+          return anotherObject;
+        })
+        .unwrap(),
+    ).toBe(anotherObject);
+    expect(
+      some(anObject)
+        .mapOpt(() => null)
+        .isNone(),
+    ).toBe(true);
+    expect(
+      some(anObject)
+        .mapOpt(() => undefined)
+        .isNone(),
+    ).toBe(true);
+  });
+
   test("match", () => {
     expect(
       some(anObject).match((value) => {
@@ -133,7 +154,7 @@ describe("Some", () => {
     expect(some(anObject).and(none()).isNone()).toBe(true);
   });
 
-  test("andThen", () => {
+  test("andThen/flatMap", () => {
     expect(
       some(anObject)
         .andThen((value) => {
@@ -145,6 +166,22 @@ describe("Some", () => {
     expect(
       some(anObject)
         .andThen((value) => {
+          expect(value).toBe(anObject);
+          return none();
+        })
+        .isNone(),
+    ).toBe(true);
+    expect(
+      some(anObject)
+        .flatMap((value) => {
+          expect(value).toBe(anObject);
+          return some(anotherObject);
+        })
+        .unwrap(),
+    ).toBe(anotherObject);
+    expect(
+      some(anObject)
+        .flatMap((value) => {
           expect(value).toBe(anObject);
           return none();
         })
@@ -189,11 +226,16 @@ describe("Some", () => {
         })
         .unwrap(),
     ).toBe(thirdObject);
+    expect(some(anObject).zipWith(none(), notCalled).isNone()).toBe(true);
   });
 
   test("join", () => {
     expect(some(some(anObject)).join().unwrap()).toBe(anObject);
     expect(some(none()).join().isNone()).toBe(true);
+  });
+
+  test("@iterator", () => {
+    expect(Array.from(some(anObject))).toEqual([anObject]);
   });
 });
 
@@ -230,11 +272,15 @@ describe("None", () => {
 
   test("okOr", () => {
     expect(none().okOr(anotherObject).unwrapErr()).toBe(anotherObject);
-  })
+  });
 
   test("okOrElse", () => {
-    expect(none().okOrElse(() => anotherObject).unwrapErr()).toBe(anotherObject);
-  })
+    expect(
+      none()
+        .okOrElse(() => anotherObject)
+        .unwrapErr(),
+    ).toBe(anotherObject);
+  });
 
   test("map", () => {
     expect(none().map(notCalled).isNone()).toBe(true);
@@ -250,6 +296,10 @@ describe("None", () => {
     );
   });
 
+  test("mapOpt", () => {
+    expect(none().mapOpt(notCalled).isNone()).toBe(true);
+  });
+
   test("match", () => {
     expect(none().match(notCalled, () => anotherObject)).toBe(anotherObject);
   });
@@ -259,8 +309,9 @@ describe("None", () => {
     expect(none().and(none()).isNone()).toBe(true);
   });
 
-  test("andThen", () => {
+  test("andThen/flatMap", () => {
     expect(none().andThen(notCalled).isNone()).toBe(true);
+    expect(none().flatMap(notCalled).isNone()).toBe(true);
   });
 
   test("filter", () => {
@@ -301,5 +352,9 @@ describe("None", () => {
 
   test("join", () => {
     expect(none<Option<unknown>>().join().isNone()).toBe(true);
+  });
+
+  test("@iterator", () => {
+    expect(Array.from(none())).toEqual([]);
   });
 });

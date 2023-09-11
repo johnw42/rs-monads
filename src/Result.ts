@@ -11,6 +11,32 @@ export function err<T, E>(error: E): Result<T, E> {
   return new Err(error);
 }
 
+export function constOk<E, T>(value: T): Ok<T, E> {
+  return new Ok(value);
+}
+
+export function constErr<T, E>(error: E): Err<T, E> {
+  return new Err(error);
+}
+
+/**
+ * Tests wether an unknown value is an instance of `Result`.
+ */
+export function isResult(arg: unknown): arg is Result<unknown, unknown> {
+  return arg instanceof Ok || arg instanceof Err;
+}
+
+export namespace Result {
+  export function fromPromise<T>(
+    promise: Promise<T>,
+  ): Promise<Result<T, unknown>> {
+    return promise.then(
+      (value) => ok(value),
+      (error) => err(error),
+    );
+  }
+}
+
 export class Ok<T, E> implements IResult<T, E> {
   constructor(readonly value: T) {}
 
@@ -101,6 +127,10 @@ export class Ok<T, E> implements IResult<T, E> {
   [Symbol.iterator](): Iterator<T> {
     return [this.value].values();
   }
+
+  toPromise(): Promise<T> {
+    return Promise.resolve(this.value);
+  }
 }
 
 export class Err<T, E> implements IResult<T, E> {
@@ -131,7 +161,7 @@ export class Err<T, E> implements IResult<T, E> {
   }
 
   unwrapOr<D>(defaultValue?: D): D {
-    throw defaultValue;
+    return defaultValue;
   }
 
   unwrapOrElse<R>(d: (error: E) => R): R {
@@ -147,7 +177,7 @@ export class Err<T, E> implements IResult<T, E> {
   }
 
   err(): Some<E> {
-    return constSome(this.error)
+    return constSome(this.error);
   }
 
   map<R>(f: (value: T) => R): Err<R, E> {
@@ -192,5 +222,9 @@ export class Err<T, E> implements IResult<T, E> {
 
   [Symbol.iterator](): Iterator<T> {
     return [].values();
+  }
+
+  toPromise(): Promise<T> {
+    return Promise.reject(this.error);
   }
 }

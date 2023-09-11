@@ -85,4 +85,6 @@ export interface IResult<T, E> extends Iterable<T> {
    * `d(x)` where `x` is the error value of `this`.
    */
   orElse<R, RE>(d: (error: E) => Result<R, RE>): Ok<T, E> | Result<R, RE>;
+
+  toPromise(): Promise<T>;
 }

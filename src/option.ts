@@ -42,20 +42,12 @@ export function constNone<T>(): None<T> {
 /**
  * Tests wether an unknown value is an instance of `Option`.
  */
-export function isOption<T = unknown>(arg: unknown): arg is Option<T> {
-  return arg instanceof Object && OptionTag in arg;
+export function isOption(arg: unknown): arg is Option<unknown> {
+  return arg instanceof Some || arg instanceof None;
 }
 
-const OptionTag = Symbol("OptionTag");
-
 export class Some<T> implements IOption<T> {
-  [OptionTag]: null = null;
-
   constructor(readonly value: T) {}
-
-  [Symbol.iterator](): Iterator<T> {
-    return [this.value].values();
-  }
 
   isSome(): this is Some<T> {
     return true;
@@ -97,9 +89,7 @@ export class Some<T> implements IOption<T> {
     return some(f(this.value));
   }
 
-  mapOpt<R extends NonNullable<unknown>>(
-    f: (value: T) => R | undefined | null,
-  ): Option<R> {
+  mapOpt<R>(f: (value: T) => R | undefined | null): Option<NonNullable<R>> {
     return opt(f(this.value));
   }
 
@@ -153,39 +143,16 @@ export class Some<T> implements IOption<T> {
     return other.isSome() ? new Some(f(this.value, other.value)) : none();
   }
 
-
-  // zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R>;
-  // zipWith<UU extends any[], R>(
-  //   others: { [I in keyof UU]: Option<UU[I]> },
-  //   f: (first: T, ...rest: UU) => R,
-  // ): Option<R>;
-  // zipWith<U, R>(others: Option<U> | Option<unknown>[], f: Function): Option<R> {
-  //   if (Array.isArray(others)) {
-  //     const args: unknown[] = [this.value];
-  //     for (const other of others) {
-  //       if (other.isNone()) {
-  //         return none();
-  //       }
-  //       args.push(other.unwrap());
-  //     }
-  //     return new Some(f(...args));
-  //   } else {
-  //     return others.isSome() ? new Some(f(this.value, others.value)) : none();
-  //   }
-  // }
-
   join<T>(this: Option<Option<T>>): Option<T> {
     return (this as Some<Option<T>>).value;
+  }
+
+  [Symbol.iterator](): Iterator<T> {
+    return [this.value].values();
   }
 }
 
 export class None<T> implements IOption<T> {
-  [OptionTag]: null = null;
-
-  [Symbol.iterator](): Iterator<T> {
-    return [].values();
-  }
-
   isSome(): false {
     return false;
   }
@@ -203,7 +170,7 @@ export class None<T> implements IOption<T> {
   }
 
   unwrap(errorFactory?: () => unknown): never {
-    throw (errorFactory ? errorFactory() : new Error("Missing Option value."));
+    throw errorFactory ? errorFactory() : new Error("Missing Option value.");
   }
 
   unwrapOr<D>(defaultValue?: D): D | undefined {
@@ -278,17 +245,12 @@ export class None<T> implements IOption<T> {
     return constNone();
   }
 
-  // zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): None<R>;
-  // zipWith<UU extends any[], R>(
-  //   others: { [I in keyof UU]: Option<UU[I]> },
-  //   f: (...args: UU) => R,
-  // ): None<R>;
-  // zipWith<U, R>(other: unknown, f: unknown): None<R> {
-  //   return _none();
-  // }
-
   join<T>(this: Option<Option<T>>): None<T> {
     return constNone();
+  }
+
+  [Symbol.iterator](): Iterator<T> {
+    return [].values();
   }
 }
 

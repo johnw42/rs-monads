@@ -2,13 +2,10 @@ module.exports = {
   collectCoverage: true,
   coverageThreshold: {
     global: {
-      lines: 90,
+      lines: 100,
     },
   },
   preset: "ts-jest",
   testEnvironment: "node",
   testRegex: "/.*\\.test\\.ts$",
-  // transform: {
-  //   "^.+\\.tsx?$": "ts-jest",
-  // },
 };
