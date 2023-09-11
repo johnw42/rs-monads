@@ -1,51 +1,63 @@
-interface IOption<T extends NonNullable<unknown>> extends Iterable<T> {
-  readonly value: T | null | undefined;
-  isSome(): this is Some<T>;
-  isSomeAnd(f: (arg: T) => unknown): this is Some<T>;
-  isNone(): this is None<T>;
-  expect(message: string | (() => string)): T;
-  unwrap(): T;
-  unwrapOr<D>(defaultValue: D): D | T;
-  unwrapOrElse<U>(f: () => U): T | U;
-  map<U extends NonNullable<unknown>>(f: (arg: T) => U): Option<U>;
-  mapOr<D, U>(defaultValue: D, f: (arg: T) => U): D | U;
-  mapOrElse<D, U>(d: () => D, f: (arg: T) => U): D | U;
-  match<R>(funcs: { some: (arg: T) => R; none: () => R }): R;
-  and<U extends NonNullable<unknown>>(other: Option<U>): Option<U>;
-  andThen<U extends NonNullable<unknown>>(f: (arg: T) => Option<U>): Option<U>;
-  filter(p: (value: T) => unknown): Option<T>;
-  or<U extends NonNullable<unknown>>(other: Option<U>): Option<T> | Option<U>;
-  orElse<U extends NonNullable<unknown>>(
-    f: (arg: T) => Option<U>,
-  ): Option<T> | Option<U>;
-  xor(other: Option<T>): Option<T>;
-  zip<U extends NonNullable<unknown>>(other: Option<U>): Option<[T, U]>;
-  zipWith<U extends NonNullable<unknown>, R extends NonNullable<unknown>>(
-    other: Option<U>,
-    f: (a: T, b: U) => R,
-  ): Option<R>;
+import { type IOption } from "./IOption";
+
+/**
+ * A type that can contain 0 or 1 values.
+ */
+export type Option<T> = Some<T> | None<T>;
+
+/**
+ * Returns `some(value)` if `value` is not null or undefined; otherwise returns `none()`.
+ */
+export function opt<T>(value: T): Option<NonNullable<T>> {
+  return value == null ? none<NonNullable<T>>() : some(value);
 }
 
-export type Option<T extends NonNullable<unknown>> = Some<T> | None<T>;
+/**
+ * Returns an instance of `Some` whose value is `value`.  The return value uses
+ * `Option` rather than `Some` to avoid constraining the type of variabled
+ * initialize by a call to this function.
+ */
+export function some<T>(value: T): Option<T> {
+  return new Some(value);
+}
 
-const TAG = Symbol("OptionTag");
+/**
+ * Returns an instance of `None`.  The return value uses `Option` rather than
+ * `None` to avoid constraining the type of variabled initialize by a call to
+ * this function.
+ */
+export function none<T>(): Option<T> {
+  return NONE as Option<T>;
+}
 
-export class Some<T extends NonNullable<unknown>> implements IOption<T> {
-  [TAG]: null = null;
+function _none<T>(): None<T> {
+  return NONE as None<T>;
+}
 
-  constructor(readonly value: T) {
-  }
+/**
+ * Tests wether an unknown value is an instance of `Option`.
+ */
+export function isOption<T = unknown>(arg: unknown): arg is Option<T> {
+  return arg instanceof Object && OptionTag in arg;
+}
+
+const OptionTag = Symbol("OptionTag");
+
+export class Some<T> implements IOption<T> {
+  [OptionTag]: null = null;
+
+  constructor(readonly value: T) {}
 
   [Symbol.iterator](): Iterator<T> {
     return [this.value].values();
   }
 
-  isSome(): true {
+  isSome(): this is Some<T> {
     return true;
   }
 
-  isSomeAnd(f: (arg: T) => unknown): boolean {
-    return Boolean(f(this.value));
+  isSomeAnd(p: (value: T) => unknown): this is Some<T> {
+    return Boolean(p(this.value));
   }
 
   isNone(): false {
@@ -56,90 +68,116 @@ export class Some<T extends NonNullable<unknown>> implements IOption<T> {
     return this.value;
   }
 
-  unwrap(): T {
+  unwrap(errorFactory?: () => unknown): T {
     return this.value;
   }
 
-  unwrapOr<D>(defaultValue: D): T {
+  unwrapOr<D>(defaultValue?: D): T {
     return this.value;
   }
 
-  unwrapOrElse<U>(f: () => U): T {
+  unwrapOrElse<R>(d: () => R): T {
     return this.value;
   }
 
-  map<U extends NonNullable<unknown>>(f: (arg: T) => U): Option<U> {
+  map<R>(f: (value: T) => R): Option<R> {
+    return some(f(this.value));
+  }
+
+  mapOpt<R extends NonNullable<unknown>>(
+    f: (value: T) => R | undefined | null,
+  ): Option<R> {
     return opt(f(this.value));
   }
 
-  mapOr<D, U>(defaultValue: D, f: (arg: T) => U): U {
+  mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
     return f(this.value);
   }
 
-  mapOrElse<D, U>(d: () => D, f: (arg: T) => U): U {
+  mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
     return f(this.value);
   }
 
-  match<R>(funcs: { some: (arg: T) => R; none: () => R }): R {
-    return funcs.some(this.value);
+  match<R>(onSome: (value: T) => R, onNone: () => R): R {
+    return onSome(this.value);
   }
 
-  and<U extends NonNullable<unknown>>(other: Option<U>): Option<U> {
+  and<U>(other: Option<U>): Option<U> {
     return other;
   }
 
-  andThen<U extends NonNullable<unknown>>(f: (arg: T) => Option<U>): Option<U> {
+  andThen<R>(f: (value: T) => Option<R>): Option<R> {
     return f(this.value);
   }
 
+  flatMap<R>(f: (value: T) => Option<R>): Option<R> {
+    return this.andThen(f);
+  }
+
   filter(p: (value: T) => unknown): Option<T> {
-    return p(this.value) ? this : (NONE as Option<T>);
+    return p(this.value) ? this : none();
   }
 
-  or<U extends NonNullable<unknown>>(other: Option<U>): Some<T> {
+  or<U>(other: Option<U>): Some<T> {
     return this;
   }
 
-  orElse<U extends NonNullable<unknown>>(f: (arg: T) => Option<U>): Some<T> {
+  orElse<R>(f: (value: T) => Option<R>): Some<T> {
     return this;
   }
 
-  xor(other: Option<T>): Option<T> {
-    return other.isNone() ? this : other;
+  xor<U>(other: Option<U>): Option<T> | None<U> {
+    return other.isNone() ? this : _none<U>();
   }
 
-  zip<U extends NonNullable<unknown>>(other: Option<U>): Option<[T, U]> {
+  zip<U>(other: Option<U>): Option<[T, U]> {
     return other.isSome()
       ? new Some([this.value, other.value] as [T, U])
-      : (NONE as Option<[T, U]>);
+      : none();
   }
 
-  zipWith<U extends NonNullable<unknown>, R extends NonNullable<unknown>>(
-    other: Option<U>,
-    f: (a: T, b: U) => R,
-  ): Option<R> {
-    return other.isSome()
-      ? new Some(f(this.value, other.value))
-      : (NONE as Option<R>);
+  zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R> {
+    return other.isSome() ? new Some(f(this.value, other.value)) : none();
+  }
+
+
+  // zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R>;
+  // zipWith<UU extends any[], R>(
+  //   others: { [I in keyof UU]: Option<UU[I]> },
+  //   f: (first: T, ...rest: UU) => R,
+  // ): Option<R>;
+  // zipWith<U, R>(others: Option<U> | Option<unknown>[], f: Function): Option<R> {
+  //   if (Array.isArray(others)) {
+  //     const args: unknown[] = [this.value];
+  //     for (const other of others) {
+  //       if (other.isNone()) {
+  //         return none();
+  //       }
+  //       args.push(other.unwrap());
+  //     }
+  //     return new Some(f(...args));
+  //   } else {
+  //     return others.isSome() ? new Some(f(this.value, others.value)) : none();
+  //   }
+  // }
+
+  join<T>(this: Option<Option<T>>): Option<T> {
+    return (this as Some<Option<T>>).value;
   }
 }
 
-export class None<T extends NonNullable<unknown>> implements IOption<T> {
-  [TAG]: null = null;
+export class None<T> implements IOption<T> {
+  [OptionTag]: null = null;
 
   [Symbol.iterator](): Iterator<T> {
     return [].values();
-  }
-
-  get value(): undefined {
-    return undefined;
   }
 
   isSome(): false {
     return false;
   }
 
-  isSomeAnd(f: (arg: T) => unknown): false {
+  isSomeAnd(p: (value: T) => unknown): false {
     return false;
   }
 
@@ -151,82 +189,86 @@ export class None<T extends NonNullable<unknown>> implements IOption<T> {
     throw typeof message === "string" ? message : message();
   }
 
-  unwrap(): T {
-    throw new Error("Missing Option value.");
+  unwrap(errorFactory?: () => unknown): never {
+    throw errorFactory ? errorFactory() : new Error("Missing Option value.");
   }
 
-  unwrapOr<D>(defaultValue: D): D {
+  unwrapOr<D>(defaultValue?: D): D | undefined {
     return defaultValue;
   }
 
-  unwrapOrElse<U>(f: () => U): U {
+  unwrapOrElse<R>(f: () => R): R {
     return f();
   }
 
-  map<U extends NonNullable<unknown>>(f: (arg: T) => U): Option<U> {
-    return NONE as Option<U>;
+  map<R>(f: (value: T) => R): None<R> {
+    return _none();
   }
 
-  mapOr<D, U>(defaultValue: D, f: (arg: T) => U): D {
+  mapOpt<R>(f: (value: T) => R): None<NonNullable<R>> {
+    return _none();
+  }
+
+  mapOr<D, R>(defaultValue: D, f: (value: T) => R): D {
     return defaultValue;
   }
 
-  mapOrElse<D, U>(d: () => D, f: (arg: T) => U): D {
+  mapOrElse<D, R>(d: () => D, f: (value: T) => R): D {
     return d();
   }
 
-  match<R>(funcs: { some: (arg: T) => R; none: () => R }): R {
-    return funcs.none();
+  match<R>(onSome: (value: T) => R, onNone: () => R): R {
+    return onNone();
   }
 
-  and<U extends NonNullable<unknown>>(other: Option<U>): Option<U> {
-    return NONE as Option<U>;
+  and<U>(other: Option<U>): None<U> {
+    return _none();
   }
 
-  andThen<U extends NonNullable<unknown>>(f: (arg: T) => Option<U>): Option<U> {
-    return NONE as Option<U>;
+  andThen<R>(f: (value: T) => Option<R>): None<R> {
+    return _none();
   }
 
-  filter(p: (value: T) => unknown): Option<T> {
-    return NONE as Option<T>;
+  flatMap<R>(f: (value: T) => Option<R>): None<R> {
+    return this.andThen(f);
   }
 
-  or<U extends NonNullable<unknown>>(other: Option<U>): Option<U> {
+  filter(p: (value: T) => unknown): None<T> {
+    return _none();
+  }
+
+  or<U>(other: Option<U>): Option<U> {
     return other;
   }
 
-  orElse<U extends NonNullable<unknown>>(f: (arg: T) => Option<U>): Option<T> {
-    return this;
+  orElse<R>(f: (value: T) => Option<R>): None<T> {
+    return _none();
   }
 
-  xor(other: Option<T>): Option<T> {
+  xor<U>(other: Option<U>): Option<T> | Option<U> {
     return other.isSome() ? this : other;
   }
 
-  zip<U extends NonNullable<unknown>>(other: Option<U>): None<[T, U]> {
-    return NONE as None<[T, U]>;
+  zip<U>(other: Option<U>): None<[T, U]> {
+    return _none();
   }
 
-  zipWith<U extends NonNullable<unknown>, R extends NonNullable<unknown>>(
-    other: Option<U>,
-    f: (a: T, b: U) => R,
-  ): None<R> {
-    return NONE as None<R>;
+  zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): None<R> {
+    return _none();
+  }
+
+  // zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): None<R>;
+  // zipWith<UU extends any[], R>(
+  //   others: { [I in keyof UU]: Option<UU[I]> },
+  //   f: (...args: UU) => R,
+  // ): None<R>;
+  // zipWith<U, R>(other: unknown, f: unknown): None<R> {
+  //   return _none();
+  // }
+
+  join<T>(this: Option<Option<T>>): None<T> {
+    return _none();
   }
 }
 
 const NONE = new None<NonNullable<unknown>>();
-
-export function opt<T extends NonNullable<unknown>>(
-  value: T | undefined | null,
-): Option<T> {
-  return value == null ? (NONE as None<T>) : new Some(value);
-}
-
-export function some<T extends NonNullable<unknown>>(value: T): Some<T> {
-  return new Some(value);
-}
-
-export function none<T extends NonNullable<unknown>>(): None<T> {
-  return NONE as None<T>;
-}
