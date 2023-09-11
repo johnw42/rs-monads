@@ -1,4 +1,5 @@
 import { type IResult } from "./IResult";
+import { None, Some, constNone, constSome } from "./Option";
 
 export type Result<T, E> = Ok<T, E> | Err<T, E>;
 
@@ -39,6 +40,14 @@ export class Ok<T, E> implements IResult<T, E> {
 
   unwrapOrElse<R>(d: (error: E) => R): T {
     return this.value;
+  }
+
+  ok(): Some<T> {
+    return constSome(this.value);
+  }
+
+  err(): None<E> {
+    return constNone();
   }
 
   map<R>(f: (value: T) => R): Ok<R, E> {
@@ -117,8 +126,16 @@ export class Err<T, E> implements IResult<T, E> {
     return d(this.error);
   }
 
+  ok(): None<T> {
+    return constNone();
+  }
+
+  err(): Some<E> {
+    return constSome(this.error)
+  }
+
   map<R>(f: (value: T) => R): Err<R, E> {
-    return this as unknown as Err<R,E>;
+    return this as unknown as Err<R, E>;
   }
 
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): D {

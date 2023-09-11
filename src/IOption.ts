@@ -1,4 +1,5 @@
 import { Some, None, Option } from "./Option";
+import { type Result } from "./Result";
 
 export interface IOption<T> extends Iterable<T> {
   /**
@@ -32,6 +33,8 @@ export interface IOption<T> extends Iterable<T> {
    * If `this` is `some(x)`, returns `x`, otherwise returns `f()`.
    */
   unwrapOrElse<R>(d: () => R): T | R;
+  okOr<E>(error: E): Result<T, E>;
+  okOrElse<E>(error: () => E): Result<T, E>;
   /**
    * If `this` is `some(x)`, returns `some(f(x))`, otherwise returns
    * `none()`.

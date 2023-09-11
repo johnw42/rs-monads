@@ -1,4 +1,5 @@
 import { type IOption } from "./IOption";
+import { Err, Ok } from "./Result";
 
 /**
  * A type that can contain 0 or 1 values.
@@ -30,7 +31,11 @@ export function none<T>(): Option<T> {
   return NONE as Option<T>;
 }
 
-function _none<T>(): None<T> {
+export function constSome<T>(value: T): Some<T> {
+  return new Some(value);
+}
+
+export function constNone<T>(): None<T> {
   return NONE as None<T>;
 }
 
@@ -80,6 +85,14 @@ export class Some<T> implements IOption<T> {
     return this.value;
   }
 
+  okOr<E>(error: E): Ok<T, E> {
+    return new Ok(this.value);
+  }
+
+  okOrElse<E>(error: () => E): Ok<T, E> {
+    return new Ok(this.value);
+  }
+
   map<R>(f: (value: T) => R): Option<R> {
     return some(f(this.value));
   }
@@ -127,7 +140,7 @@ export class Some<T> implements IOption<T> {
   }
 
   xor<U>(other: Option<U>): Option<T> | None<U> {
-    return other.isNone() ? this : _none<U>();
+    return other.isNone() ? this : constNone<U>();
   }
 
   zip<U>(other: Option<U>): Option<[T, U]> {
@@ -201,12 +214,20 @@ export class None<T> implements IOption<T> {
     return f();
   }
 
+  okOr<E>(error: E): Err<T, E> {
+    return new Err(error);
+  }
+
+  okOrElse<E>(error: () => E): Err<T, E> {
+    return new Err(error());
+  }
+
   map<R>(f: (value: T) => R): None<R> {
-    return _none();
+    return constNone();
   }
 
   mapOpt<R>(f: (value: T) => R): None<NonNullable<R>> {
-    return _none();
+    return constNone();
   }
 
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): D {
@@ -222,11 +243,11 @@ export class None<T> implements IOption<T> {
   }
 
   and<U>(other: Option<U>): None<U> {
-    return _none();
+    return constNone();
   }
 
   andThen<R>(f: (value: T) => Option<R>): None<R> {
-    return _none();
+    return constNone();
   }
 
   flatMap<R>(f: (value: T) => Option<R>): None<R> {
@@ -234,7 +255,7 @@ export class None<T> implements IOption<T> {
   }
 
   filter(p: (value: T) => unknown): None<T> {
-    return _none();
+    return constNone();
   }
 
   or<U>(other: Option<U>): Option<U> {
@@ -250,11 +271,11 @@ export class None<T> implements IOption<T> {
   }
 
   zip<U>(other: Option<U>): None<[T, U]> {
-    return _none();
+    return constNone();
   }
 
   zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): None<R> {
-    return _none();
+    return constNone();
   }
 
   // zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): None<R>;
@@ -267,7 +288,7 @@ export class None<T> implements IOption<T> {
   // }
 
   join<T>(this: Option<Option<T>>): None<T> {
-    return _none();
+    return constNone();
   }
 }
 

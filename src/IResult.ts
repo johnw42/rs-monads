@@ -1,4 +1,5 @@
 import { Err, Ok, Result } from "./Result";
+import { type Option } from "./Option";
 
 export interface IResult<T, E> extends Iterable<T> {
   /**
@@ -32,6 +33,8 @@ export interface IResult<T, E> extends Iterable<T> {
    * If `this` is `ok(x)`, returns `x`, otherwise returns `f()`.
    */
   unwrapOrElse<R>(d: (error: E) => R): T | R;
+  ok(): Option<T>;
+  err(): Option<E>;
   /**
    * If `this` is `ok(x)`, returns `ok(f(x))`, otherwise returns `this`.
    */
