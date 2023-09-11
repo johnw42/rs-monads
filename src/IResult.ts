@@ -1,5 +1,5 @@
 import { Err, Ok, Result } from "./Result";
-import { type Option } from "./Option";
+import { type Option  } from "./Option";
 
 export interface IResult<T, E> extends Iterable<T> {
   /**
@@ -14,6 +14,7 @@ export interface IResult<T, E> extends Iterable<T> {
    * Tests whether `this` does not contain a value.
    */
   isErr(): this is Err<T, E>;
+  isErrAnd(p: (error: E) => unknown): this is Err<T, E>;
   /**
    * If `this` is `ok(_)`, returns it, otherwise throws `Error(message)`
    * or `Error(message())`.
@@ -33,6 +34,7 @@ export interface IResult<T, E> extends Iterable<T> {
    * If `this` is `ok(x)`, returns `x`, otherwise returns `f()`.
    */
   unwrapOrElse<R>(d: (error: E) => R): T | R;
+  unwrapErr(errorFactory?: () => unknown): E;
   ok(): Option<T>;
   err(): Option<E>;
   /**

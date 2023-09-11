@@ -26,6 +26,10 @@ export class Ok<T, E> implements IResult<T, E> {
     return false;
   }
 
+  isErrAnd(p: (error: E) => unknown): false {
+    return false;
+  }
+
   expect(message: string | (() => unknown)): T {
     return this.value;
   }
@@ -40,6 +44,10 @@ export class Ok<T, E> implements IResult<T, E> {
 
   unwrapOrElse<R>(d: (error: E) => R): T {
     return this.value;
+  }
+
+  unwrapErr(errorFactory?: () => unknown): E {
+    throw errorFactory ? errorFactory() : Error("Missing error value");
   }
 
   ok(): Some<T> {
@@ -110,6 +118,10 @@ export class Err<T, E> implements IResult<T, E> {
     return true;
   }
 
+  isErrAnd(p: (error: E) => unknown): this is Err<T, E> {
+    return Boolean(p(this.error));
+  }
+
   expect(message: string | (() => unknown)): never {
     throw typeof message === "string" ? message : message();
   }
@@ -124,6 +136,10 @@ export class Err<T, E> implements IResult<T, E> {
 
   unwrapOrElse<R>(d: (error: E) => R): R {
     return d(this.error);
+  }
+
+  unwrapErr(errorFactory?: () => unknown): E {
+    return this.error;
   }
 
   ok(): None<T> {

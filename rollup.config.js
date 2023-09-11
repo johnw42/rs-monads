@@ -2,16 +2,17 @@ const commonjs = require("@rollup/plugin-commonjs");
 const resolve = require("@rollup/plugin-node-resolve");
 const typescript = require("rollup-plugin-typescript2");
 const pkg = require("./package.json");
+const path = require("node:path");
 
 module.exports = {
-  input: "src/index.ts",
+  input: ["src/index.ts"],
   output: [
     {
-      file: pkg.main,
+      dir: path.dirname(pkg.main),
       format: "cjs",
     },
     {
-      file: pkg.module,
+      dir: path.dirname(pkg.module),
       format: "es",
     },
   ],

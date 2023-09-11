@@ -80,6 +80,14 @@ describe("Some", () => {
     expect(some(anObject).unwrapOrElse(notCalled)).toBe(anObject);
   });
 
+  test("okOr", () => {
+    expect(some(anObject).okOr(anotherObject).unwrap()).toBe(anObject);
+  })
+
+  test("okOrElse", () => {
+    expect(some(anObject).okOrElse(notCalled).unwrap()).toBe(anObject);
+  })
+
   test("map", () => {
     expect(
       some(anObject)
@@ -219,6 +227,14 @@ describe("None", () => {
   test("unwrapOrElse", () => {
     expect(none().unwrapOrElse(() => anotherObject)).toBe(anotherObject);
   });
+
+  test("okOr", () => {
+    expect(none().okOr(anotherObject).unwrapErr()).toBe(anotherObject);
+  })
+
+  test("okOrElse", () => {
+    expect(none().okOrElse(() => anotherObject).unwrapErr()).toBe(anotherObject);
+  })
 
   test("map", () => {
     expect(none().map(notCalled).isNone()).toBe(true);
