@@ -1,44 +1,99 @@
 import { type IResult } from "./IResult";
 import { None, Some, constNone, constSome } from "./Option";
 
+/**
+ * A type that can contain a succes value of type `T` or an error value of type
+ * `E`.
+ */
 export type Result<T, E> = Ok<T, E> | Err<T, E>;
 
-export function ok<E, T>(value: T): Result<T, E> {
-  return new Ok(value);
+/**
+ * Subtype of `Result<T, E>` that contains a success value of type `T`.
+ */
+export type Ok<T, E> = OkImpl<T, E>;
+
+/**
+ * Subtype of `Result<T, E>` that contains an error value of type `E`.
+ */
+export type Err<T, E> = ErrImpl<T, E>;
+
+/**
+ * Returns an instance of `Ok` whose value is `value`.  The return value uses
+ * `Result` rather than `Ok` to avoid constraining the type of variables
+ * initialize by a call to this function.
+ *
+ * @see {@link constOk}
+ */
+export function Ok<E, T>(value: T): Result<T, E> {
+  return new OkImpl(value);
 }
 
-export function err<T, E>(error: E): Result<T, E> {
-  return new Err(error);
+/**
+ * Returns an instance of `Err` whose value is `error`.  The return value uses
+ * `Result` rather than `Err` to avoid constraining the type of variables
+ * initialize by a call to this function.
+ *
+ * @see {@link constErr}
+ */
+export function Err<T, E>(error: E): Result<T, E> {
+  return new ErrImpl(error);
 }
 
+/**
+ * Same as {@link Ok}, but returns a more specific type.
+ */
 export function constOk<E, T>(value: T): Ok<T, E> {
-  return new Ok(value);
+  return new OkImpl(value);
 }
 
+/**
+ * Same as {@link Err}, but returns a more specific type.
+ */
 export function constErr<T, E>(error: E): Err<T, E> {
-  return new Err(error);
+  return new ErrImpl(error);
 }
 
 /**
  * Tests wether an unknown value is an instance of `Result`.
  */
 export function isResult(arg: unknown): arg is Result<unknown, unknown> {
-  return arg instanceof Ok || arg instanceof Err;
+  return arg instanceof OkImpl || arg instanceof ErrImpl;
 }
 
-export namespace Result {
-  export function fromPromise<T>(
+export const Result = {
+  /**
+   * Returns `Ok(x)` if `f()` returns `x`, or `Err(x)` of `f()` throws `x`.
+   */
+  try<T>(f: () => T): Result<T, unknown> {
+    try {
+      return Ok(f());
+    } catch (error) {
+      return Err(error);
+    }
+  },
+
+  /**
+   * Converts a promise that resolves to `x` into a promise that resolves to
+   * `Ok(x)`, and converts a promise that rejects with `x` to a promise that
+   * resolves to `Err(x)`.
+   */
+  fromPromise<T>(
     promise: Promise<T>,
   ): Promise<Result<T, unknown>> {
     return promise.then(
-      (value) => ok(value),
-      (error) => err(error),
+      (value) => Ok(value),
+      (error) => Err(error),
     );
   }
 }
 
-export class Ok<T, E> implements IResult<T, E> {
-  constructor(readonly value: T) {}
+class OkImpl<T, E> implements IResult<T, E> {
+  constructor(
+    /**
+     * The value contained in this object.
+     */
+    readonly value: T,
+  ) {}
 
   isOk(): this is Ok<T, E> {
     return true;
@@ -64,7 +119,7 @@ export class Ok<T, E> implements IResult<T, E> {
     return this.value;
   }
 
-  unwrapOr<D>(defaultValue?: D): T | D {
+  unwrapOr<D>(defaultValue: D): T | D {
     return this.value;
   }
 
@@ -85,7 +140,7 @@ export class Ok<T, E> implements IResult<T, E> {
   }
 
   map<R>(f: (value: T) => R): Ok<R, E> {
-    return new Ok(f(this.value));
+    return new OkImpl(f(this.value));
   }
 
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
@@ -133,8 +188,13 @@ export class Ok<T, E> implements IResult<T, E> {
   }
 }
 
-export class Err<T, E> implements IResult<T, E> {
-  constructor(readonly error: E) {}
+class ErrImpl<T, E> implements IResult<T, E> {
+  constructor(
+    /**
+     * The error value contained in this object.
+     */
+    readonly error: E,
+  ) {}
 
   isOk(): false {
     return false;
@@ -157,10 +217,10 @@ export class Err<T, E> implements IResult<T, E> {
   }
 
   unwrap(errorFactory?: () => unknown): never {
-    throw errorFactory ? errorFactory() : new Error("Missing Result value.");
+    throw errorFactory ? errorFactory() : this.error;
   }
 
-  unwrapOr<D>(defaultValue?: D): D {
+  unwrapOr<D>(defaultValue: D): D {
     return defaultValue;
   }
 
@@ -193,7 +253,7 @@ export class Err<T, E> implements IResult<T, E> {
   }
 
   mapErr<R>(f: (error: E) => R): Err<T, R> {
-    return new Err(f(this.error));
+    return new ErrImpl(f(this.error));
   }
 
   match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R {

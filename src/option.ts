@@ -1,53 +1,80 @@
 import { type IOption } from "./IOption";
-import { Err, Ok } from "./Result";
+import { Err, Ok, constErr, constOk } from "./Result";
 
 /**
- * A type that can contain 0 or 1 values.
+ * A type that can contain a single value or no value.
  */
 export type Option<T> = Some<T> | None<T>;
 
 /**
- * Returns `some(value)` if `value` is not null or undefined; otherwise returns `none()`.
+ * Subtype of Option<T> that contains a value.
  */
-export function opt<T>(value: T): Option<NonNullable<T>> {
-  return value == null ? none<NonNullable<T>>() : some(value);
-}
+export type Some<T> = SomeImpl<T>;
+
+/**
+ * Subtype of Option<T> that does not contains a value.
+ */
+export type None<T> = NoneImpl<T>;
 
 /**
  * Returns an instance of `Some` whose value is `value`.  The return value uses
- * `Option` rather than `Some` to avoid constraining the type of variabled
+ * `Option` rather than `Some` to avoid constraining the type of variables
  * initialize by a call to this function.
+ *
+ * @see {@link constSome}
  */
-export function some<T>(value: T): Option<T> {
-  return new Some(value);
+export function Some<T>(value: T): Option<T> {
+  return new SomeImpl(value);
 }
 
 /**
  * Returns an instance of `None`.  The return value uses `Option` rather than
- * `None` to avoid constraining the type of variabled initialize by a call to
+ * `None` to avoid constraining the type of variables initialize by a call to
  * this function.
+ *
+ * @see {@link constNone}
  */
-export function none<T>(): Option<T> {
+export function None<T>(): Option<T> {
   return NONE as Option<T>;
 }
 
+/**
+ * Same as {@link Some}, but returns a more specific type.
+ */
 export function constSome<T>(value: T): Some<T> {
-  return new Some(value);
+  return new SomeImpl(value);
 }
 
+/**
+ * Same as {@link None}, but returns a more specific type.
+ */
 export function constNone<T>(): None<T> {
-  return NONE as None<T>;
+  return NONE as NoneImpl<T>;
 }
 
 /**
  * Tests wether an unknown value is an instance of `Option`.
  */
 export function isOption(arg: unknown): arg is Option<unknown> {
-  return arg instanceof Some || arg instanceof None;
+  return arg instanceof SomeImpl || arg instanceof NoneImpl;
 }
 
-export class Some<T> implements IOption<T> {
-  constructor(readonly value: T) {}
+export const Option = {
+  /**
+   * Returns `Some(value)` if `value` is not null or undefined; otherwise returns `None()`.
+   */
+  fromNullable<T>(value: T): Option<NonNullable<T>> {
+    return value == null ? None<NonNullable<T>>() : Some(value);
+  },
+};
+
+class SomeImpl<T> implements IOption<T> {
+  constructor(
+    /**
+     * The value contained in this object.
+     */
+    readonly value: T,
+  ) {}
 
   isSome(): this is Some<T> {
     return true;
@@ -69,7 +96,7 @@ export class Some<T> implements IOption<T> {
     return this.value;
   }
 
-  unwrapOr<D>(defaultValue?: D): T {
+  unwrapOr<D>(defaultValue: D): T {
     return this.value;
   }
 
@@ -77,20 +104,26 @@ export class Some<T> implements IOption<T> {
     return this.value;
   }
 
+  toNullable(): T {
+    return this.value;
+  }
+
   okOr<E>(error: E): Ok<T, E> {
-    return new Ok(this.value);
+    return constOk(this.value);
   }
 
   okOrElse<E>(error: () => E): Ok<T, E> {
-    return new Ok(this.value);
+    return constOk(this.value);
   }
 
   map<R>(f: (value: T) => R): Option<R> {
-    return some(f(this.value));
+    return Some(f(this.value));
   }
 
-  mapOpt<R>(f: (value: T) => R | undefined | null): Option<NonNullable<R>> {
-    return opt(f(this.value));
+  mapNullable<R>(
+    f: (value: T) => R | undefined | null,
+  ): Option<NonNullable<R>> {
+    return Option.fromNullable(f(this.value));
   }
 
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
@@ -118,7 +151,7 @@ export class Some<T> implements IOption<T> {
   }
 
   filter(p: (value: T) => unknown): Option<T> {
-    return p(this.value) ? this : none();
+    return p(this.value) ? this : None();
   }
 
   or<U>(other: Option<U>): Some<T> {
@@ -135,16 +168,16 @@ export class Some<T> implements IOption<T> {
 
   zip<U>(other: Option<U>): Option<[T, U]> {
     return other.isSome()
-      ? new Some([this.value, other.value] as [T, U])
-      : none();
+      ? new SomeImpl([this.value, other.value] as [T, U])
+      : None();
   }
 
   zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R> {
-    return other.isSome() ? new Some(f(this.value, other.value)) : none();
+    return other.isSome() ? new SomeImpl(f(this.value, other.value)) : None();
   }
 
   join<T>(this: Option<Option<T>>): Option<T> {
-    return (this as Some<Option<T>>).value;
+    return (this as SomeImpl<Option<T>>).value;
   }
 
   [Symbol.iterator](): Iterator<T> {
@@ -152,7 +185,7 @@ export class Some<T> implements IOption<T> {
   }
 }
 
-export class None<T> implements IOption<T> {
+class NoneImpl<T> implements IOption<T> {
   isSome(): false {
     return false;
   }
@@ -173,7 +206,7 @@ export class None<T> implements IOption<T> {
     throw errorFactory ? errorFactory() : new Error("Missing Option value.");
   }
 
-  unwrapOr<D>(defaultValue?: D): D | undefined {
+  unwrapOr<D>(defaultValue: D): D | undefined {
     return defaultValue;
   }
 
@@ -181,19 +214,23 @@ export class None<T> implements IOption<T> {
     return f();
   }
 
+  toNullable(): undefined {
+    return undefined;
+  }
+
   okOr<E>(error: E): Err<T, E> {
-    return new Err(error);
+    return constErr(error);
   }
 
   okOrElse<E>(error: () => E): Err<T, E> {
-    return new Err(error());
+    return constErr(error());
   }
 
   map<R>(f: (value: T) => R): None<R> {
     return constNone();
   }
 
-  mapOpt<R>(f: (value: T) => R): None<NonNullable<R>> {
+  mapNullable<R>(f: (value: T) => R): None<NonNullable<R>> {
     return constNone();
   }
 
@@ -254,4 +291,4 @@ export class None<T> implements IOption<T> {
   }
 }
 
-const NONE = new None<NonNullable<unknown>>();
+const NONE = new NoneImpl<NonNullable<unknown>>();
