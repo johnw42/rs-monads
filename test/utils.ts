@@ -1,10 +1,10 @@
 export type T = { T: true };
-export type E = { E: true };
 export type R = { R: true };
+export type E = { E: true };
 
 export const theT: T = { T: true };
-export const theE: E = { E: true };
 export const theR: R = { R: true };
+export const theE: E = { E: true };
 
 export function notCalled(...args: any[]): never {
   throw Error("Called notCalled");

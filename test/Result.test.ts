@@ -21,7 +21,7 @@ import {
   theT,
 } from "./utils";
 
-describe("functions", () => {
+describe("Result functions", () => {
   test("aliases", () => {
     const ok: SameType<Result.Ok<T, E>, Ok<T, E>> = constOk(theT);
     const err: SameType<Result.Err<T, E>, Err<T, E>> = constErr(theE);
@@ -77,13 +77,13 @@ describe("functions", () => {
     expect((await Result.fromPromise(Promise.resolve(theT))).unwrap()).toBe(
       theT,
     );
-    expect(
-      (await Result.fromPromise(Promise.reject(theT))).unwrapErr(),
-    ).toBe(theT);
+    expect((await Result.fromPromise(Promise.reject(theE))).unwrapErr()).toBe(
+      theE,
+    );
   });
 });
 
-describe("Ok", () => {
+describe("Result methods", () => {
   test("value", () => {
     expect(constOk(theT).value).toBe(theT);
     // @ts-expect-error
@@ -92,75 +92,94 @@ describe("Ok", () => {
     expect(Err(theT).value).toBe(undefined);
   });
 
+  test("error", () => {
+    expect(constErr(theT).error).toBe(theT);
+    // @ts-expect-error
+    expect(Err(theT).error).toBe(theT);
+    // @ts-expect-error
+    expect(Ok(theT).error).toBe(undefined);
+  });
+
   test("isOk", () => {
     expect(Ok(0).isOk()).toBe(true);
+    expect(Err(theT).isOk()).toBe(false);
   });
 
   test("isOkAnd", () => {
-    expect(Ok(theT).isOkAnd(expectArg(theT, theT))).toBe(true);
-    expect(Ok(theT).isOkAnd(expectArg(theT, theR))).toBe(false);
+    expect(Ok(theT).isOkAnd(expectArg(theT, true))).toBe(true);
+    expect(Ok(theT).isOkAnd(expectArg(theT, false))).toBe(false);
+    expect(Err(theT).isOkAnd(notCalled)).toBe(false);
   });
 
   test("isErr", () => {
     expect(Ok(theT).isErr()).toBe(false);
+    expect(Err(theT).isErr()).toBe(true);
   });
 
   test("isErrAnd", () => {
     expect(Ok(theT).isErrAnd(notCalled)).toBe(false);
+    expect(Err(theE).isErrAnd(expectArg(theE, true))).toBe(true);
+    expect(Err(theE).isErrAnd(expectArg(theE, false))).toBe(false);
   });
 
   test("expect", () => {
     expect(Ok(theT).expect("")).toBe(theT);
     expect(Ok(theT).expect(notCalled)).toBe(theT);
+    expect(() => Err(theT).expect("xyzzy")).toThrow(Error("xyzzy"));
+    expect(() => Err(theT).expect(() => "xyzzy")).toThrow(Error("xyzzy"));
   });
 
   test("expectErr", () => {
-    const error1: any = Result.try(() =>
-      Ok(theT).expectErr("xyzzy"),
-    ).unwrapErr();
-    expect(error1).toBeInstanceOf(Error);
-    expect(error1.message).toBe("xyzzy");
-    const error2: any = Result.try(() =>
-      Ok(theT).expectErr(() => "xyzzy"),
-    ).unwrapErr();
-    expect(error2).toBeInstanceOf(Error);
-    expect(error2.message).toBe("xyzzy");
+    expect(() => Ok(theT).expectErr("xyzzy")).toThrow(Error("xyzzy"));
+    expect(() => Ok(theT).expectErr(() => "xyzzy")).toThrow(Error("xyzzy"));
+    expect(Err(theE).expectErr("")).toBe(theE);
+    expect(Err(theE).expectErr(notCalled)).toBe(theE);
   });
 
   test("unwrap", () => {
     expect(Ok(theT).unwrap()).toBe(theT);
     expect(Ok(theT).unwrap(notCalled)).toBe(theT);
+    expect(() => Err(Error("xyzzy")).unwrap()).toThrow("xyzzy");
+    expect(() => Err(theE).unwrap(() => Error("xyzzy"))).toThrow(
+      Error("xyzzy"),
+    );
   });
 
   test("unwrapOr", () => {
     expect(Ok(theT).unwrapOr(theE)).toBe(theT);
+    expect(Err(theT).unwrapOr(theE)).toBe(theE);
   });
 
   test("unwrapOrElse", () => {
     expect(Ok(theT).unwrapOrElse(notCalled)).toBe(theT);
+    expect(Err(theT).unwrapOrElse(() => theE)).toBe(theE);
   });
 
   test("unwrapUnchecked", () => {
     expect(Ok(theT).unwrapUnchecked()).toBe(theT);
+    expect(Err(theT).unwrapUnchecked()).toBe(undefined);
   });
 
   test("unwrapErr", () => {
     expect(() => Ok(theT).unwrapErr()).toThrow(Error);
-    expect(() => Ok(theT).unwrapErr(() => new Error("xyzzy"))).toThrow(
-      "xyzzy",
-    );
+    expect(() => Ok(theT).unwrapErr(() => new Error("xyzzy"))).toThrow("xyzzy");
+    expect(Err(theT).unwrapErr()).toBe(theT);
+    expect(Err(theT).unwrapErr(notCalled)).toBe(theT);
   });
 
   test("unwrapErrUnchecked", () => {
     expect(Ok(theT).unwrapErrUnchecked()).toBe(undefined);
+    expect(Err(theT).unwrapErrUnchecked()).toBe(theT);
   });
 
   test("ok", () => {
     expect(Ok(theT).ok().unwrap()).toBe(theT);
+    expect(Err(theT).ok().isNone()).toBe(true);
   });
 
   test("err", () => {
     expect(Ok(theT).err().isNone()).toBe(true);
+    expect(Err(theT).err().unwrap()).toBe(theT);
   });
 
   test("map", () => {
@@ -172,6 +191,7 @@ describe("Ok", () => {
         })
         .unwrap(),
     ).toBe(theE);
+    expect(Err(theT).map(notCalled).unwrapErr()).toBe(theT);
   });
 
   test("mapOr", () => {
@@ -181,6 +201,7 @@ describe("Ok", () => {
         return theE;
       }),
     ).toBe(theE);
+    expect(Err(theT).mapOr(theE, notCalled)).toBe(theE);
   });
 
   test("mapOrElse", () => {
@@ -190,203 +211,11 @@ describe("Ok", () => {
         return theE;
       }),
     ).toBe(theE);
+    expect(Err(theT).mapOrElse(() => theE, notCalled)).toBe(theE);
   });
 
   test("mapErr", () => {
     expect(Ok(theT).mapErr(notCalled).unwrap()).toBe(theT);
-  });
-
-  test("match", () => {
-    const okFunc = jest.fn(expectArg(theT, theR));
-
-    expect(Ok(theT).match(okFunc, notCalled) satisfies R).toBe(
-      theR,
-    );
-
-    expect(
-      Ok(theT).match({
-        Ok: okFunc,
-        Err: notCalled,
-      }) satisfies R,
-    ).toBe(theR);
-
-    expect(
-      Ok(theT).match({
-        Ok: okFunc,
-      }) satisfies void,
-    ).toBe(undefined);
-
-    expect(Ok(theT).match({ Err: notCalled }) satisfies void).toBe(
-      undefined,
-    );
-
-    expect(okFunc.mock.calls.length).toBe(3);
-  });
-
-  test("and", () => {
-    expect(Ok(theT).and(Ok(theE)).unwrap()).toBe(theE);
-    expect(Ok(theT).and(Err(theE)).unwrapErr()).toBe(
-      theE,
-    );
-  });
-
-  test("andThen/flatMap", () => {
-    expect(
-      Ok(theT)
-        .andThen((value) => {
-          expect(value).toBe(theT);
-          return Ok(theE);
-        })
-        .unwrap(),
-    ).toBe(theE);
-    expect(
-      Ok(theT)
-        .andThen((value) => {
-          expect(value).toBe(theT);
-          return Err(theE);
-        })
-        .unwrapErr(),
-    ).toBe(theE);
-    expect(
-      Ok(theT)
-        .flatMap((value) => {
-          expect(value).toBe(theT);
-          return Ok(theE);
-        })
-        .unwrap(),
-    ).toBe(theE);
-    expect(
-      Ok(theT)
-        .flatMap((value) => {
-          expect(value).toBe(theT);
-          return Err(theE);
-        })
-        .unwrapErr(),
-    ).toBe(theE);
-  });
-
-  test("or", () => {
-    expect(Ok(theT).or(Ok(theE)).unwrap()).toBe(theT);
-    expect(Ok(theT).or(Err(theE)).unwrap()).toBe(theT);
-  });
-
-  test("orElse", () => {
-    expect(Ok(theT).orElse(notCalled).unwrap()).toBe(theT);
-  });
-
-  test("transpose", () => {
-    expect(Ok(Some(theT)).transpose().unwrap().unwrap()).toBe(theT);
-    expect(Ok(None()).transpose().isNone()).toBe(true);
-  });
-
-  test("toPromise", async () => {
-    expect(await Ok(theT).toPromise()).toBe(theT);
-  });
-
-  test("toString", () => {
-    expect(Ok(42).toString()).toBe("Ok(42)");
-  });
-
-  test("@iterator", () => {
-    expect(Array.from(Ok(theT))).toEqual([theT]);
-  });
-});
-
-describe("Err", () => {
-  test("error", () => {
-    expect(constErr(theT).error).toBe(theT);
-    // @ts-expect-error
-    expect(Err(theT).error).toBe(theT);
-    // @ts-expect-error
-    expect(Ok(theT).error).toBe(undefined);
-  });
-
-  test("isOk", () => {
-    expect(Err(theT).isOk()).toBe(false);
-  });
-
-  test("isOkAnd", () => {
-    expect(Err(theT).isOkAnd(notCalled)).toBe(false);
-  });
-
-  test("isErr", () => {
-    expect(Err(theT).isErr()).toBe(true);
-  });
-
-  test("isErrAnd", () => {
-    expect(Err(theE).isErrAnd(expectArg(theE, theE))).toBe(true);
-    expect(Err(theE).isErrAnd(expectArg(theE, theR))).toBe(false);
-  });
-
-  test("expect", () => {
-    const error1: any = Result.try(() =>
-      Err(theT).expect("xyzzy"),
-    ).unwrapErr();
-    expect(error1).toBeInstanceOf(Error);
-    expect(error1.message).toBe("xyzzy");
-    const error2: any = Result.try(() =>
-      Err(theT).expect(() => "xyzzy"),
-    ).unwrapErr();
-    expect(error2).toBeInstanceOf(Error);
-    expect(error2.message).toBe("xyzzy");
-  });
-
-  test("expectErr", () => {
-    expect(Err(theT).expectErr("")).toBe(theT);
-    expect(Err(theT).expectErr(notCalled)).toBe(theT);
-  });
-
-  test("unwrap", () => {
-    expect(Result.try(() => Err(theT).unwrap()).unwrapErr()).toBe(theT);
-    expect(
-      Result.try(() => Err(theT).unwrap(() => theE)).unwrapErr(),
-    ).toBe(theE);
-  });
-
-  test("unwrapOr", () => {
-    expect(Err(theT).unwrapOr(theE)).toBe(theE);
-  });
-
-  test("unwrapOrElse", () => {
-    expect(Err(theT).unwrapOrElse(() => theE)).toBe(theE);
-  });
-
-  test("unwrapUnchecked", () => {
-    expect(Err(theT).unwrapUnchecked()).toBe(undefined);
-  });
-
-  test("unwrapErr", () => {
-    expect(Err(theT).unwrapErr()).toBe(theT);
-    expect(Err(theT).unwrapErr(notCalled)).toBe(theT);
-  });
-
-  test("unwrapUnchecked", () => {
-    expect(Err(theT).unwrapErrUnchecked()).toBe(theT);
-  });
-
-  test("ok", () => {
-    expect(Err(theT).ok().isNone()).toBe(true);
-  });
-
-  test("err", () => {
-    expect(Err(theT).err().unwrap()).toBe(theT);
-  });
-
-  test("map", () => {
-    expect(Err(theT).map(notCalled).unwrapErr()).toBe(theT);
-  });
-
-  test("mapOr", () => {
-    expect(Err(theT).mapOr(theE, notCalled)).toBe(theE);
-  });
-
-  test("mapOrElse", () => {
-    expect(Err(theT).mapOrElse(() => theE, notCalled)).toBe(
-      theE,
-    );
-  });
-
-  test("mapErr", () => {
     expect(
       Err(theT)
         .mapErr((value) => {
@@ -398,10 +227,18 @@ describe("Err", () => {
   });
 
   test("match", () => {
+    const okFunc = jest.fn(expectArg(theT, theR));
     const errFunc = jest.fn(expectArg(theE, theR));
 
+    expect(Ok(theT).match(okFunc, notCalled) satisfies R).toBe(theR);
     expect(Err(theE).match(notCalled, errFunc) satisfies R).toBe(theR);
 
+    expect(
+      Ok(theT).match({
+        Ok: okFunc,
+        Err: notCalled,
+      }) satisfies R,
+    ).toBe(theR);
     expect(
       Err(theE).match({
         Ok: notCalled,
@@ -410,36 +247,47 @@ describe("Err", () => {
     ).toBe(theR);
 
     expect(
+      Ok(theT).match({
+        Ok: okFunc,
+      }) satisfies void,
+    ).toBe(undefined);
+    expect(
       Err(theE).match({
         Err: errFunc,
       }) satisfies void,
     ).toBe(undefined);
 
-    expect(Err(theE).match({ Ok: notCalled }) satisfies void).toBe(
-      undefined,
-    );
+    expect(Ok(theT).match({ Err: notCalled }) satisfies void).toBe(undefined);
+    expect(Err(theE).match({ Ok: notCalled }) satisfies void).toBe(undefined);
 
+    expect(okFunc.mock.calls.length).toBe(3);
     expect(errFunc.mock.calls.length).toBe(3);
   });
 
   test("and", () => {
+    expect(Ok(theT).and(Ok(theE)).unwrap()).toBe(theE);
+    expect(Ok(theT).and(Err(theE)).unwrapErr()).toBe(theE);
     expect(Err(theT).and(Ok(theE)).unwrapErr()).toBe(theT);
     expect(Err(theT).and(Err(theE)).unwrapErr()).toBe(theT);
   });
 
-  test("andThen/flatMap", () => {
-    expect(Err(theT).andThen(notCalled).unwrapErr()).toBe(theT);
-    expect(Err(theT).flatMap(notCalled).unwrapErr()).toBe(theT);
+  test.each([
+    ["andThen", (x: Result<T, E>, f: (arg: T) => Result<R, E>) => x.andThen(f)],
+    ["flatMap", (x: Result<T, E>, f: (arg: T) => Result<R, E>) => x.flatMap(f)],
+  ])("%s", (_name, andThen) => {
+    expect(andThen(Ok(theT), expectArg(theT, Ok(theR))).unwrap()).toBe(theR);
+    expect(andThen(Err(theE), notCalled).unwrapErr()).toBe(theE);
   });
 
   test("or", () => {
+    expect(Ok(theT).or(Ok(theE)).unwrap()).toBe(theT);
+    expect(Ok(theT).or(Err(theE)).unwrap()).toBe(theT);
     expect(Err(theT).or(Ok(theE)).unwrap()).toBe(theE);
-    expect(Err(theT).or(Err(theE)).unwrapErr()).toBe(
-      theE,
-    );
+    expect(Err(theT).or(Err(theE)).unwrapErr()).toBe(theE);
   });
 
   test("orElse", () => {
+    expect(Ok(theT).orElse(notCalled).unwrap()).toBe(theT);
     expect(
       Err(theT)
         .orElse(() => Ok(theE))
@@ -453,25 +301,23 @@ describe("Err", () => {
   });
 
   test("transpose", () => {
-    expect(
-      Err<Option<T>, E>(theE).transpose().unwrap().unwrapErr(),
-    ).toBe(theE);
+    expect(Ok(Some(theT)).transpose().unwrap().unwrap()).toBe(theT);
+    expect(Ok(None()).transpose().isNone()).toBe(true);
+    expect(Err<Option<T>, E>(theE).transpose().unwrap().unwrapErr()).toBe(theE);
   });
 
   test("toPromise", async () => {
-    try {
-      await await Err(theT).toPromise();
-      expect(true).toBe(false);
-    } catch (error) {
-      expect(error).toBe(theT);
-    }
+    expect(Ok(theT).toPromise()).resolves.toBe(theT);
+    expect(Err(Error("xyzzy")).toPromise()).rejects.toThrow(Error("xyzzy"));
   });
 
   test("toString", () => {
+    expect(Ok(42).toString()).toBe("Ok(42)");
     expect(Err(42).toString()).toBe("Err(42)");
   });
 
   test("@iterator", () => {
-    expect(Array.from(Err(theT))).toEqual([]);
+    expect(Array.from(Ok(theT))).toEqual([theT]);
+    expect(Array.from(Err(theE))).toEqual([]);
   });
 });
