@@ -23,10 +23,16 @@ export interface IResult<T, E> extends Iterable<T> {
   isErrAnd(p: (error: E) => unknown): this is Err<T, E>;
 
   /**
-   * If `this` is `Ok(_)`, returns it, otherwise throws `Error(message)`
+   * If `this` is `Ok(x)`, returns `x`, otherwise throws `Error(message)`
    * or `Error(message())`.
    */
   expect(message: string | (() => string)): T;
+
+  /**
+   * If `this` is `Err(x)`, returns `x`, otherwise throws `Error(message)`
+   * or `Error(message())`.
+   */
+  expectErr(message: string | (() => string)): E;
 
   /**
    * If `this` is `Ok(x)`, returns `x`, otherwise throws an error. If

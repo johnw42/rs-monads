@@ -294,8 +294,12 @@ describe("None", () => {
   });
 
   test("expect", () => {
-    expect(() => None().expect("xyzzy")).toThrow("xyzzy");
-    expect(() => None().expect(() => "xyzzy")).toThrow("xyzzy");
+    const error1 = Result.try(() => None().expect("xyzzy")).unwrapErr();
+    expect(error1).toBeInstanceOf(Error);
+    expect((error1 as Error).message).toBe("xyzzy");
+    const error2 = Result.try(() => None().expect(() => "xyzzy")).unwrapErr();
+    expect(error2).toBeInstanceOf(Error);
+    expect((error2 as Error).message).toBe("xyzzy");
   });
 
   test("unwrap", () => {

@@ -18,7 +18,7 @@ export interface IOption<T> extends Iterable<T> {
   isNone(): this is None<T>;
 
   /**
-   * If `this` is `Some(_)`, returns it, otherwise throws `Error(message)`
+   * If `this` is `Some(x)`, returns `x`, otherwise throws `Error(message)`
    * or `Error(message())`.
    */
   expect(message: string | (() => string)): T;

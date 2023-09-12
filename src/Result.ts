@@ -63,6 +63,8 @@ export function isResult(arg: unknown): arg is Result<unknown, unknown> {
 export const Result = {
   /**
    * Returns `Ok(x)` if `f()` returns `x`, or `Err(x)` of `f()` throws `x`.
+   * 
+   * Its approximate inverse is {@link Option#unwrap}.
    */
   try<T>(f: () => T): Result<T, unknown> {
     try {
@@ -109,8 +111,12 @@ class OkImpl<T, E> implements IResult<T, E> {
     return false;
   }
 
-  expect(message: string | (() => unknown)): T {
+  expect(message: string | (() => string)): T {
     return this.value;
+  }
+
+  expectErr(message: string | (() => string)): never {
+    throw Error(typeof message === "string" ? message : message());
   }
 
   unwrap(errorFactory?: () => unknown): T {
@@ -229,8 +235,12 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return Boolean(p(this.error));
   }
 
-  expect(message: string | (() => unknown)): never {
-    throw typeof message === "string" ? message : message();
+  expect(message: string | (() => string)): never {
+    throw Error(typeof message === "string" ? message : message());
+  }
+
+  expectErr(message: string | (() => string)): E {
+    return this.error;
   }
 
   unwrap(errorFactory?: () => unknown): never {

@@ -13,16 +13,44 @@ it's easy to remember most of the based on a few patterns.
 - Methods that panic in Rust throw errors.
 - Many type signatures are loosened to take advantage of TypeScript union types.
 - The constructors `Some`, `None`, `Ok`, and `Err` are top-level functions.
-- Each constructor has a corresponding type.  In addition to the generic method
-  signatures provided by `Option` and `Result`, the methods on the contructor
-  types are narrowed to more precise signatures.
+- Each constructor has a corresponding type.  The methods on the constructor
+  types have more precise signatures than those declared on `Option` and
+  `Result`.
+- Values of type `Some` and `Ok` allow direct access to their inner value via
+  their `value` field; values of type `Err` likewise have an `error` field.
+- Methods like `copied` and `cloned`, which are specific to Rust's type system,
+  have been omitted.
 
-### New Methods
+### New Functions
 
+- The top-level `Some`, `None`, `Ok`, and `Err` functions have corresponding
+  funtions with more precised signatured named `constSome`, `constNone`,
+  `constOk`, and `constErr`.
+- There are top-level type predicates, `isOption` and `isResult`.
+- The function `Option.fromNullable` function converts null and undefined values to `None()`;
+  the `Option.toNullable` method performs the roughly inverse operation and is a shorthand for
+  `o.unwrapOr(undefined)`.
+- The `Result.try` function converts exceptions to `Err` values; it is roughly
+  the inverse of `r.unwrap()`.
+- The `Result.fromPromise` function and `Result.toPromise` method allow easy
+  between representing an error as a rejected promise or promise resolved to as
+  `Err` value.
+- The `andThen` methods are aliased as `flatMap` for consistency with JavaScript
+  APIs.
+
+### Changed Methods
+
+- The `expect` and `expectErr` methods can accept a function returning a string
+  in addition to a plain string.
+- The `unwrap` and `unwrapErr` methods can accept a optional nullary function to
+  create the error value to be thrown on failure.
+- `Err.unwrap` will throw its error value by default.
+- Instead of an `iter` method, `Option` and `Result` use the JavaScript iterable
+  protocol.
 
 ## Alternatives
 * [@hoganassessments/maybe-ts](https://www.npmjs.com/package/@hoganassessments/maybe-ts) - no README
-* [@jeppech/results-ts](https://www.npmjs.com/package/@jeppech/results-ts) - Rust-line, uses snake_case
+* [@jeppech/results-ts](https://www.npmjs.com/package/@jeppech/results-ts) - Rust-like, uses snake_case
 * [@nextcapital/maybe](https://www.npmjs.com/package/@nextcapital/maybe) - more like a Result type
 * [@pacote/option](https://www.npmjs.com/package/@pacote/option) - function-style interface
 * [@sweet-monads/maybe](https://www.npmjs.com/package/@sweet-monads/maybe) - has `mapNullable`, missing `toNullable`
