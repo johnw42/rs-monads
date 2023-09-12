@@ -170,6 +170,9 @@ interface IOption<T> extends Iterable<T> {
 
   /**
    * If `this` is `Some(x)`, returns `onSome(x)`, otherwise returns `onNone()`.
+   *
+   * Compared to the other signatures of this method, this one has the least
+   * overhead, and it works best with TypeScript's inference rules.
    */
   match<R>(onSome: (value: T) => R, onNone: () => R): R;
   /**
@@ -329,7 +332,7 @@ class SomeImpl<T> implements IOption<T> {
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
     return f(this.value);
   }
-  
+
   match<R>(onSome: (value: T) => R, onNone: () => R): R;
   match<R>(m: Pick<Matcher<T, R>, "Some">): void;
   match<R>(m: Pick<Matcher<T, R>, "None">): void;
@@ -389,14 +392,14 @@ class SomeImpl<T> implements IOption<T> {
   }
 
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
-    return this.unwrapUnchecked().match({
-      Ok(value: T) {
-        return Ok<Option<T>, E>(constSome(value));
+    return this.unwrapUnchecked().match(
+      (value: T) => {
+        return Ok(constSome(value));
       },
-      Err(error: E) {
-        return Err<Option<T>, E>(error);
+      (error: E) => {
+        return Err(error);
       },
-    });
+    );
   }
 
   [Symbol.iterator](): Iterator<T> {

@@ -199,7 +199,11 @@ interface IResult<T, E> extends Iterable<T> {
   mapErr<R>(f: (error: E) => R): Result<T, R>;
 
   /**
-   * If `this` is `Ok(x)`, returns `onOk(x)`, otherwise returns `onErr(e)` where `this` is `Err(e)`.
+   * If `this` is `Ok(x)`, returns `onOk(x)`, otherwise returns `onErr(e)` where
+   * `this` is `Err(e)`.
+   *
+   * Compared to the other signatures of this method, this one has the least
+   * overhead, and it works best with TypeScript's inference rules.
    */
   match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
   /**
@@ -211,7 +215,8 @@ interface IResult<T, E> extends Iterable<T> {
    */
   match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
   /**
-   * If `this` is `Ok(x)`, returns `m.Ok(x)`, otherwise returns `m.Err(e)` where `this` is `Err(e)`.
+   * If `this` is `Ok(x)`, returns `m.Ok(x)`, otherwise returns `m.Err(e)` where
+   * `this` is `Err(e)`.
    */
   match<R>(m: Matcher<T, E, R>): R;
 
@@ -383,14 +388,10 @@ class OkImpl<T, E> implements IResult<T, E> {
   }
 
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
-    return this.unwrapUnchecked().match({
-      Some(value) {
-        return Some(Ok<T, E>(value));
-      },
-      None() {
-        return None<Result<T, E>>();
-      },
-    });
+    return this.unwrapUnchecked().match(
+      (value) => Some(Ok(value)),
+      () => None(),
+    );
   }
 
   toPromise(): Promise<T> {
