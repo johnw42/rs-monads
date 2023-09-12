@@ -90,6 +90,11 @@ export namespace Result {
   export type Err<T, E> = ErrImpl<T, E>;
 }
 
+interface Matcher<T, E, R> {
+  Ok(value: T): R;
+  Err(error: E): R;
+}
+
 /**
  * The interface implemented by {@link Result}.
  */
@@ -194,10 +199,17 @@ interface IResult<T, E> extends Iterable<T> {
   mapErr<R>(f: (error: E) => R): Result<T, R>;
 
   /**
-   * If `this` is `Ok(x)`, returns `onOk(x)`, otherwise returns
-   * `onErr()`.
+   * If `this` is `Ok(x)`, calls `m.Ok(x)`.
    */
-  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
+  match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
+  /**
+   * If `this` is `Err(x)`, calls `m.Err(x)`.
+   */
+  match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
+  /**
+   * If `this` is `Ok(x)`, returns `m.Ok(x)`, otherwise returns `m.Err(x)`.
+   */
+  match<R>(m: Matcher<T, E, R>): R;
 
   /**
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
@@ -330,8 +342,14 @@ class OkImpl<T, E> implements IResult<T, E> {
     return this as unknown as Ok<T, R>;
   }
 
-  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R {
-    return onOk(this.value);
+  match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
+  match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
+  match<R>(m: Matcher<T, E, R>): R;
+  match<R>(m: Partial<Matcher<T, E,  R>>): void | R {
+    if (m.Ok) {
+      const r = m.Ok(this.value);
+      return m.Err ? r : undefined;
+    }
   }
 
   and<T2, E2>(other: Result<T2, E2>): Result<T2, E2> {
@@ -355,10 +373,14 @@ class OkImpl<T, E> implements IResult<T, E> {
   }
 
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
-    return this.unwrapUnchecked().match(
-      (value: T) => Some(Ok(value)),
-      () => None(),
-    );
+    return this.unwrapUnchecked().match({
+      Some(value) {
+        return Some(Ok<T,E>(value));
+      },
+      None() {
+        return None<Result<T,E>>();
+      },
+    });
   }
 
   toPromise(): Promise<T> {
@@ -457,8 +479,14 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return new ErrImpl(f(this.error));
   }
 
-  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R {
-    return onErr(this.error);
+  match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
+  match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
+  match<R>(m: Matcher<T, E, R>): R;
+  match<R>(m: Partial<Matcher<T, E, R>>): void | R {
+    if (m.Err) {
+      const r = m.Err(this.error);
+      return m.Ok ? r : undefined;
+    }
   }
 
   and<T2, E2>(other: Result<T2, E2>): Err<T, E> {

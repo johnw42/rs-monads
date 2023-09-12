@@ -52,6 +52,51 @@ defined in these namespaces are also available as top-level imports.
 - Instead of an `iter` method, `Option` and `Result` use the JavaScript iterable
   protocol.
 
+## Examples
+
+### A pipeline of fallible calls.
+
+JavaScript's `?.` operator makes this case easy!
+
+```ts
+function pipeline(a: A | undefined): D | undefined {
+  return a?.convertToB()?.convertToC()?.convertToD();
+}
+```
+
+But what if we're using functions instead of methods?  Things suddenly get much uglier.
+
+```ts
+function convertAToB(a: A): B  {...} 
+function convertBToC(b: B): C | null {...} 
+function convertCToD(c: C): D | undefined {...} 
+
+function pipeline1(a: A | undefined): D | undefined {
+  if (a === undefined) {
+    return undefined;
+  }
+  const b = convertAToB(a);
+  const c = convertBToC(b);
+  if (c === null) {
+    return undefined;
+  }
+  const d = convertCToD(c);
+  return d;
+}
+```
+
+But with the `Option` type, it's much less ugly!
+
+```ts
+function pipeline2(a: A | undefined): D | undefined {
+  return Option.fromNullable(a)
+    .map(convertAToB)
+    .mapNullable(convertBToC)
+    .mapNullable(convertCToD)
+    .toNullable();
+}
+```
+
 ## Alternatives
 * [@hoganassessments/maybe-ts](https://www.npmjs.com/package/@hoganassessments/maybe-ts) - no README
 * [@jeppech/results-ts](https://www.npmjs.com/package/@jeppech/results-ts) - Rust-like, uses snake_case

@@ -13,13 +13,12 @@ import {
   SameType,
   anObject,
   anotherObject,
-  isEq,
   isZero,
   notCalled,
   thirdObject,
+  T,
+  expectArg,
 } from "./utils";
-
-type T = typeof anObject;
 
 describe("functions", () => {
   test("aliases", () => {
@@ -180,12 +179,27 @@ describe("Some", () => {
   });
 
   test("match", () => {
+    const someFunc = jest.fn((value) => {
+      expect(value).toBe(anObject);
+      return thirdObject;
+    });
+
     expect(
-      Some(anObject).match((value) => {
-        expect(value).toBe(anObject);
-        return anotherObject;
-      }, notCalled),
-    ).toBe(anotherObject);
+      Some(anObject).match({
+        Some: someFunc,
+        None: notCalled,
+      }),
+    ).toBe(thirdObject);
+
+    expect(
+      Some(anObject).match({
+        Some: someFunc,
+      }),
+    ).toBe(undefined);
+
+    expect(Some(anObject).match({ None: notCalled })).toBe(undefined);
+
+    expect(someFunc.mock.calls.length).toBe(2);
   });
 
   test("and", () => {
@@ -198,26 +212,17 @@ describe("Some", () => {
   test("andThen/flatMap", () => {
     expect(
       Some(anObject)
-        .andThen((value) => {
-          expect(value).toBe(anObject);
-          return Some(anotherObject);
-        })
+        .andThen(expectArg(anObject, Some(anotherObject)))
         .unwrap(),
     ).toBe(anotherObject);
     expect(
       Some(anObject)
-        .andThen((value) => {
-          expect(value).toBe(anObject);
-          return None();
-        })
+        .andThen(expectArg(anObject, None()))
         .isNone(),
     ).toBe(true);
     expect(
       Some(anObject)
-        .flatMap((value) => {
-          expect(value).toBe(anObject);
-          return Some(anotherObject);
-        })
+        .flatMap(expectArg(anObject, Some(anotherObject)))
         .unwrap(),
     ).toBe(anotherObject);
     expect(
@@ -231,8 +236,8 @@ describe("Some", () => {
   });
 
   test("filter", () => {
-    expect(Some(anObject).filter(isEq(anObject)).unwrap()).toBe(anObject);
-    expect(Some(anotherObject).filter(isEq(anObject)).isNone()).toBe(true);
+    expect(Some(anObject).filter(expectArg(anObject, true)).unwrap()).toBe(anObject);
+    expect(Some(anObject).filter(expectArg(anObject, false)).isNone()).toBe(true);
   });
 
   test("or", () => {
@@ -363,7 +368,26 @@ describe("None", () => {
   });
 
   test("match", () => {
-    expect(None().match(notCalled, () => anotherObject)).toBe(anotherObject);
+    const noneFunc = jest.fn(() => {
+      return anotherObject;
+    });
+
+    expect(
+      None().match({
+        Some: notCalled,
+        None: noneFunc,
+      }),
+    ).toBe(anotherObject);
+
+    expect(
+      None().match({
+        Some: notCalled,
+      }),
+    ).toBe(undefined);
+
+    expect(None().match({ None: noneFunc })).toBe(undefined);
+
+    expect(noneFunc.mock.calls.length).toBe(2);
   });
 
   test("and", () => {

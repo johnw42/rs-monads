@@ -1,8 +1,26 @@
-import { Err, None, Ok, Option, Result, Some, constErr, constOk, isResult } from "../src/index";
-import { SameType, anObject, anotherObject, isZero, notCalled } from "./utils";
-
-type T = typeof anObject;
-type E = typeof anotherObject;
+import {
+  Err,
+  None,
+  Ok,
+  Option,
+  Result,
+  Some,
+  constErr,
+  constOk,
+  isResult,
+} from "../src/index";
+import {
+  E,
+  R,
+  SameType,
+  T,
+  anObject,
+  anotherObject,
+  expectArg,
+  isZero,
+  notCalled,
+  thirdObject,
+} from "./utils";
 
 describe("functions", () => {
   test("aliases", () => {
@@ -180,12 +198,29 @@ describe("Ok", () => {
   });
 
   test("match", () => {
+    const okFunc = jest.fn((value: T) => {
+      expect(value).toBe(anObject);
+      return thirdObject;
+    });
+
     expect(
-      Ok(anObject).match((value) => {
-        expect(value).toBe(anObject);
-        return anotherObject;
-      }, notCalled),
-    ).toBe(anotherObject);
+      Ok(anObject).match({
+        Ok: okFunc,
+        Err: notCalled,
+      }) satisfies R,
+    ).toBe(thirdObject);
+
+    expect(
+      Ok(anObject).match({
+        Ok: okFunc,
+      }) satisfies void,
+    ).toBe(undefined);
+
+    expect(Ok(anObject).match({ Err: notCalled }) satisfies void).toBe(
+      undefined,
+    );
+
+    expect(okFunc.mock.calls.length).toBe(2);
   });
 
   test("and", () => {
@@ -363,9 +398,26 @@ describe("Err", () => {
   });
 
   test("match", () => {
-    expect(Err(anObject).match(notCalled, () => anotherObject)).toBe(
-      anotherObject,
+    const errFunc = jest.fn(expectArg(anotherObject, thirdObject));
+
+    expect(
+      Err(anotherObject).match({
+        Ok: notCalled,
+        Err: errFunc,
+      }) satisfies R,
+    ).toBe(thirdObject);
+
+    expect(
+      Err(anotherObject).match({
+        Err: errFunc,
+      }) satisfies void,
+    ).toBe(undefined);
+
+    expect(Err(anotherObject).match({ Ok: notCalled }) satisfies void).toBe(
+      undefined,
     );
+
+    expect(errFunc.mock.calls.length).toBe(2);
   });
 
   test("and", () => {

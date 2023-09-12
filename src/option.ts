@@ -73,6 +73,11 @@ export namespace Option {
   export type None<T> = NoneImpl<T>;
 }
 
+interface Matcher<T, R> {
+  Some(value: T): R;
+  None(): R;
+}
+
 /**
  * The interface implemented by {@link Option}.
  */
@@ -107,7 +112,7 @@ interface IOption<T> extends Iterable<T> {
 
   /**
    * If `this` is `Some(x)`, returns `x`, otherwise returns `defaultValue`.
-   * 
+   *
    * @see {@link #toNullable}
    */
   unwrapOr<D>(defaultValue: D): D | T | undefined;
@@ -124,7 +129,7 @@ interface IOption<T> extends Iterable<T> {
 
   /**
    * If `this` is `Some(x)`, returns `x`, otherwise returns `undefined`.
-   * 
+   *
    * Equivalent to `this.unwrapOr(undefined)`.
    */
   toNullable(): T | undefined;
@@ -164,10 +169,17 @@ interface IOption<T> extends Iterable<T> {
   mapNullable<R>(f: (value: T) => R | undefined | null): Option<NonNullable<R>>;
 
   /**
-   * If `this` is `Some(x)`, returns `onSome(x)`, otherwise returns
-   * `onNone()`.
+   * If `this` is `Some(x)`, calls `m.Some(x)`.
    */
-  match<R>(onSome: (value: T) => R, onNone: () => R): R;
+  match<R>(m: Pick<Matcher<T, R>, "Some">): void;
+  /**
+   * If `this` is `None()`, calls `m.None()`.
+   */
+  match<R>(m: Pick<Matcher<T, R>, "None">): void;
+  /**
+   * If `this` is `Some(x)`, returns `m.Some(x)`, otherwise returns `m.None()`.
+   */
+  match<R>(m: Matcher<T, R>): R;
 
   /**
    * If `this` is `Some(_)`, returns `other`, otherwise returns
@@ -229,13 +241,13 @@ interface IOption<T> extends Iterable<T> {
 
   /**
    * Performs the following translation:
-   * 
+   *
    * `None()` ↦ `Ok(None())`
    *
    * `Some(Ok(x))` ↦ `Ok(Some(x))`
-   * 
+   *
    * `Some(Err(x))` ↦ `Err(x)`
-   * 
+   *
    * It is the inverse of {@link Result#transpose}
    */
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E>;
@@ -314,8 +326,14 @@ class SomeImpl<T> implements IOption<T> {
     return f(this.value);
   }
 
-  match<R>(onSome: (value: T) => R, onNone: () => R): R {
-    return onSome(this.value);
+  match<R>(m: Pick<Matcher<T, R>, "Some">): void;
+  match<R>(m: Pick<Matcher<T, R>, "None">): void;
+  match<R>(m: Matcher<T, R>): R;
+  match<R>(m: Partial<Matcher<T, R>>): void | R {
+    if (m.Some) {
+      const r = m.Some(this.value);
+      return m.None ? r : undefined;
+    }
   }
 
   and<U>(other: Option<U>): Option<U> {
@@ -361,10 +379,14 @@ class SomeImpl<T> implements IOption<T> {
   }
 
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
-    return this.unwrapUnchecked().match(
-      (value: T) => Ok(constSome(value)),
-      (error: E) => Err(error),
-    );
+    return this.unwrapUnchecked().match({
+      Ok(value: T) {
+        return Ok<Option<T>, E>(constSome(value));
+      },
+      Err(error: E) {
+        return Err<Option<T>, E>(error);
+      },
+    });
   }
 
   [Symbol.iterator](): Iterator<T> {
@@ -439,8 +461,14 @@ class NoneImpl<T> implements IOption<T> {
     return d();
   }
 
-  match<R>(onSome: (value: T) => R, onNone: () => R): R {
-    return onNone();
+  match<R>(m: Pick<Matcher<T, R>, "Some">): void;
+  match<R>(m: Pick<Matcher<T, R>, "None">): void;
+  match<R>(m: Matcher<T, R>): R;
+  match<R>(m: Partial<Matcher<T, R>>): void | R {
+    if (m.None) {
+      const r = m.None();
+      return m.Some ? r : undefined;
+    }
   }
 
   and<U>(other: Option<U>): None<U> {
