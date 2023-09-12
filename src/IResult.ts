@@ -121,6 +121,18 @@ export interface IResult<T, E> extends Iterable<T> {
   orElse<R, RE>(d: (error: E) => Result<R, RE>): Ok<T, E> | Result<R, RE>;
 
   /**
+   * Performs the following translation:
+   * 
+   * `Ok(None())` ↦ `None()`
+   *
+   * `Ok(Some(x))` ↦ `Some(Ok(x))`
+   * 
+   * `Err(x)` ↦ `Some(Err(x))`
+   * 
+   */
+  transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>>;
+
+  /**
    * If `this` is `Ok(x)`, returns a promise that resolves to `x`; if `this` is
    * `Err(x)`, returns a promise that rejects with `x`.
    */

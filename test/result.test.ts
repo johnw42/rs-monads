@@ -1,7 +1,11 @@
+import { None, Option, Some } from "../src/Option";
 import { Result, isResult, Err, Ok, constOk, constErr } from "../src/Result";
 
 const anObject = { a: 0 };
 const anotherObject = { b: 1 };
+
+type T = typeof anObject;
+type E = typeof anotherObject;
 
 function notCalled(...args: any[]): never {
   throw Error("Called notCalled");
@@ -207,6 +211,11 @@ describe("Ok", () => {
     expect(Ok(anObject).orElse(notCalled).unwrap()).toBe(anObject);
   });
 
+  test("transpose", () => {
+    expect(Ok(Some(anObject)).transpose().unwrap().unwrap()).toBe(anObject);
+    expect(Ok(None()).transpose().isNone()).toBe(true);
+  });
+
   test("toPromise", async () => {
     expect(await Ok(anObject).toPromise()).toBe(anObject);
   });
@@ -337,6 +346,12 @@ describe("Err", () => {
       Err(anObject)
         .orElse(() => Err(anotherObject))
         .unwrapErr(),
+    ).toBe(anotherObject);
+  });
+
+  test("transpose", () => {
+    expect(
+      Err<Option<T>, E>(anotherObject).transpose().unwrap().unwrapErr(),
     ).toBe(anotherObject);
   });
 

@@ -145,5 +145,18 @@ export interface IOption<T> extends Iterable<T> {
   /**
    * If `this` is `Some(some(x))` returns `Some(x)`, otherwise returns `None()`.
    */
-  join<T>(this: Option<Option<T>>): Option<T>;
+  flatten<T>(this: Option<Option<T>>): Option<T>;
+
+  /**
+   * Performs the following translation:
+   * 
+   * `None()` ↦ `Ok(None())`
+   *
+   * `Some(Ok(x))` ↦ `Ok(Some(x))`
+   * 
+   * `Some(Err(x))` ↦ `Err(x)`
+   * 
+   * It is the inverse of {@link Result#transpose}
+   */
+  transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E>;
 }

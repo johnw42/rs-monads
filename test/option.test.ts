@@ -6,6 +6,7 @@ import {
   Option,
   Some,
 } from "../src/Option";
+import { Err, Ok, Result } from "../src/Result";
 
 const anObject = { a: 0 };
 const anotherObject = { b: 1 };
@@ -256,9 +257,14 @@ describe("Some", () => {
     expect(Some(anObject).zipWith(None(), notCalled).isNone()).toBe(true);
   });
 
-  test("join", () => {
-    expect(Some(Some(anObject)).join().unwrap()).toBe(anObject);
-    expect(Some(None()).join().isNone()).toBe(true);
+  test("flatten", () => {
+    expect(Some(Some(anObject)).flatten().unwrap()).toBe(anObject);
+    expect(Some(None()).flatten().isNone()).toBe(true);
+  });
+
+  test("transpose", () => {
+    expect(Some(Ok(anObject)).transpose().unwrap().unwrap()).toBe(anObject);
+    expect(Some(Err(anObject)).transpose().unwrapErr()).toBe(anObject);
   });
 
   test("@iterator", () => {
@@ -385,8 +391,14 @@ describe("None", () => {
     expect(None().zipWith(Some(anotherObject), notCalled).isNone()).toBe(true);
   });
 
-  test("join", () => {
-    expect(None<Option<unknown>>().join().isNone()).toBe(true);
+  test("flatten", () => {
+    expect(None<Option<unknown>>().flatten().isNone()).toBe(true);
+  });
+
+  test("transpose", () => {
+    expect(None<Result<unknown, unknown>>().transpose().unwrap().isNone()).toBe(
+      true,
+    );
   });
 
   test("@iterator", () => {

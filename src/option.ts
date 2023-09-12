@@ -1,5 +1,5 @@
 import { type IOption } from "./IOption";
-import { Err, Ok, constErr, constOk } from "./Result";
+import { Err, Ok, Result, constErr, constOk } from "./Result";
 
 /**
  * A type that can contain a single value or no value.
@@ -176,8 +176,15 @@ class SomeImpl<T> implements IOption<T> {
     return other.isSome() ? new SomeImpl(f(this.value, other.value)) : None();
   }
 
-  join<T>(this: Option<Option<T>>): Option<T> {
+  flatten<T>(this: Option<Option<T>>): Option<T> {
     return (this as SomeImpl<Option<T>>).value;
+  }
+
+  transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
+    return this.unwrap().match(
+      (value: T) => Ok(constSome(value)),
+      (error: E) => Err(error),
+    );
   }
 
   [Symbol.iterator](): Iterator<T> {
@@ -286,8 +293,12 @@ class NoneImpl<T> implements IOption<T> {
     return constNone();
   }
 
-  join<T>(this: Option<Option<T>>): None<T> {
+  flatten<T>(this: Option<Option<T>>): None<T> {
     return constNone();
+  }
+
+  transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
+    return Ok(None());
   }
 
   [Symbol.iterator](): Iterator<T> {

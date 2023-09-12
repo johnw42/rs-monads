@@ -1,5 +1,5 @@
 import { type IResult } from "./IResult";
-import { None, Some, constNone, constSome } from "./Option";
+import { None, Option, Some, constNone, constSome } from "./Option";
 
 /**
  * A type that can contain a succes value of type `T` or an error value of type
@@ -24,7 +24,7 @@ export type Err<T, E> = ErrImpl<T, E>;
  *
  * @see {@link constOk}
  */
-export function Ok<E, T>(value: T): Result<T, E> {
+export function Ok<T, E>(value: T): Result<T, E> {
   return new OkImpl(value);
 }
 
@@ -177,6 +177,13 @@ class OkImpl<T, E> implements IResult<T, E> {
     return this;
   }
 
+  transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
+    return this.unwrap().match(
+      (value: T) => Some(Ok(value)),
+      () => None(),
+    );
+  }
+
   toPromise(): Promise<T> {
     return Promise.resolve(this.value);
   }
@@ -280,6 +287,10 @@ class ErrImpl<T, E> implements IResult<T, E> {
 
   orElse<R, RE>(d: (error: E) => Result<R, RE>): Result<R, RE> {
     return d(this.error);
+  }
+
+  transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
+    return Some(Err(this.unwrapErr()));
   }
 
   toPromise(): Promise<T> {
