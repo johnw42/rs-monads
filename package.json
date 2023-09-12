@@ -45,10 +45,7 @@
     "rollup": "rollup -c rollup.config.js",
     "test": "jest",
     "lint": "eslint src/*.ts",
-    "prepare": "husky install",
-    "build:dev": "webpack --mode=development",
-    "build:prod": "webpack --mode=production --node-env=production",
-    "watch": "webpack --watch"
+    "prepare": "husky install"
   },
   "sideEffects": false,
   "types": "lib",

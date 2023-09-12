@@ -1,21 +1,22 @@
-import { None, Option, Some } from "../src/Option";
-import { Result, isResult, Err, Ok, constOk, constErr } from "../src/Result";
-
-const anObject = { a: 0 };
-const anotherObject = { b: 1 };
+import { Err, None, Ok, Option, Result, Some, constErr, constOk, isResult } from "../src/index";
+import { SameType, anObject, anotherObject, isZero, notCalled } from "./utils";
 
 type T = typeof anObject;
 type E = typeof anotherObject;
 
-function notCalled(...args: any[]): never {
-  throw Error("Called notCalled");
-}
-
-function isZero(n: number): boolean {
-  return n === 0;
-}
-
 describe("functions", () => {
+  test("aliases", () => {
+    const ok: SameType<Result.Ok<T, E>, Ok<T, E>> = constOk(anObject);
+    const err: SameType<Result.Err<T, E>, Err<T, E>> = constErr(anotherObject);
+    void ok;
+    void err;
+    expect(Result.Ok).toBe(Ok);
+    expect(Result.Err).toBe(Err);
+    expect(Result.constOk).toBe(constOk);
+    expect(Result.constErr).toBe(constErr);
+    expect(Result.isResult).toBe(isResult);
+  });
+
   test("try", () => {
     expect(Result.try(() => anObject).unwrap()).toBe(anObject);
     expect(
@@ -26,19 +27,25 @@ describe("functions", () => {
   });
 
   test("Ok", () => {
-    expect(Ok(0).isOk()).toBe(true);
+    let x = Ok(anObject);
+    expect(x.isOk()).toBe(true);
+    x = Err(anObject);
   });
 
   test("Err", () => {
-    expect(Err(anObject).isOk()).toBe(false);
+    let x = Err(anObject);
+    expect(x.isOk()).toBe(false);
+    x = Ok(anObject);
   });
 
   test("constOk", () => {
-    expect(constOk(0).isOk()).toBe(true);
+    const x: Ok<T, E> = constOk(anObject);
+    expect(x.isOk()).toBe(true);
   });
 
   test("constErr", () => {
-    expect(constErr(anObject).isOk()).toBe(false);
+    const x: Err<T, E> = constErr(anotherObject);
+    expect(x.isOk()).toBe(false);
   });
 
   test("isOption", () => {
@@ -91,10 +98,14 @@ describe("Ok", () => {
   });
 
   test("expectErr", () => {
-    const error1: any = Result.try(() => Ok(anObject).expectErr("xyzzy")).unwrapErr();
+    const error1: any = Result.try(() =>
+      Ok(anObject).expectErr("xyzzy"),
+    ).unwrapErr();
     expect(error1).toBeInstanceOf(Error);
     expect(error1.message).toBe("xyzzy");
-    const error2: any = Result.try(() => Ok(anObject).expectErr(() => "xyzzy")).unwrapErr();
+    const error2: any = Result.try(() =>
+      Ok(anObject).expectErr(() => "xyzzy"),
+    ).unwrapErr();
     expect(error2).toBeInstanceOf(Error);
     expect(error2.message).toBe("xyzzy");
   });
@@ -273,10 +284,14 @@ describe("Err", () => {
   });
 
   test("expect", () => {
-    const error1: any = Result.try(() => Err(anObject).expect("xyzzy")).unwrapErr();
+    const error1: any = Result.try(() =>
+      Err(anObject).expect("xyzzy"),
+    ).unwrapErr();
     expect(error1).toBeInstanceOf(Error);
     expect(error1.message).toBe("xyzzy");
-    const error2: any = Result.try(() => Err(anObject).expect(() => "xyzzy")).unwrapErr();
+    const error2: any = Result.try(() =>
+      Err(anObject).expect(() => "xyzzy"),
+    ).unwrapErr();
     expect(error2).toBeInstanceOf(Error);
     expect(error2.message).toBe("xyzzy");
   });

@@ -5,14 +5,7 @@ import { Err, Ok, Result, constErr, constOk } from "./Result";
  */
 export type Option<T> = Some<T> | None<T>;
 
-/**
- * Subtype of Option<T> that contains a value.
- */
 export type Some<T> = SomeImpl<T>;
-
-/**
- * Subtype of Option<T> that does not contains a value.
- */
 export type None<T> = NoneImpl<T>;
 
 /**
@@ -59,6 +52,12 @@ export function isOption(arg: unknown): arg is Option<unknown> {
 }
 
 export const Option = {
+  Some,
+  None,
+  constSome,
+  constNone,
+  isOption,
+
   /**
    * Returns `Some(value)` if `value` is not null or undefined; otherwise returns `None()`.
    */
@@ -66,6 +65,19 @@ export const Option = {
     return value == null ? None<NonNullable<T>>() : Some(value);
   },
 };
+
+export namespace Option {
+  /**
+   * Subtype of `Option<T>` that contains a value.
+   */
+  export type Some<T> = SomeImpl<T>;
+
+  /**
+   * Subtype of `Option<T>` that contains no value..
+   */
+  export type None<T> = NoneImpl<T>;
+}
+
 interface IOption<T> extends Iterable<T> {
   /**
    * Tests whether `this` is `Some(_)`.

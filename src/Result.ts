@@ -6,14 +6,7 @@ import { None, Option, Some, constNone, constSome } from "./Option";
  */
 export type Result<T, E> = Ok<T, E> | Err<T, E>;
 
-/**
- * Subtype of `Result<T, E>` that contains a success value of type `T`.
- */
 export type Ok<T, E> = OkImpl<T, E>;
-
-/**
- * Subtype of `Result<T, E>` that contains an error value of type `E`.
- */
 export type Err<T, E> = ErrImpl<T, E>;
 
 /**
@@ -60,9 +53,15 @@ export function isResult(arg: unknown): arg is Result<unknown, unknown> {
 }
 
 export const Result = {
+  Ok,
+  Err,
+  constOk,
+  constErr,
+  isResult,
+
   /**
    * Returns `Ok(x)` if `f()` returns `x`, or `Err(x)` of `f()` throws `x`.
-   * 
+   *
    * Its approximate inverse is {@link Option#unwrap}.
    */
   try<T>(f: () => T): Result<T, unknown> {
@@ -85,6 +84,18 @@ export const Result = {
     );
   },
 };
+
+export namespace Result {
+  /**
+   * Subtype of `Result<T, E>` that contains a success value of type `T`.
+   */
+  export type Ok<T, E> = OkImpl<T, E>;
+
+  /**
+   * Subtype of `Result<T, E>` that contains an error value of type `E`.
+   */
+  export type Err<T, E> = ErrImpl<T, E>;
+}
 
 interface IResult<T, E> extends Iterable<T> {
   /**
@@ -223,13 +234,13 @@ interface IResult<T, E> extends Iterable<T> {
 
   /**
    * Performs the following translation:
-   * 
+   *
    * `Ok(None())` ↦ `None()`
    *
    * `Ok(Some(x))` ↦ `Some(Ok(x))`
-   * 
+   *
    * `Err(x)` ↦ `Some(Err(x))`
-   * 
+   *
    */
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>>;
 

@@ -5,9 +5,13 @@ use copy Rust APIs?  Aside from familiarity to Rust developers, I just like the
 way the Rust API is designed and I find the method names regular enough that
 it's easy to remember most of the based on a few patterns.
 
-## Changes from Rust
+## General Overview
 
-### General Changes
+The main types in this package are `Option` and `Result`.  Each of these types
+is also a namespace containining important functions and subtypes.  Most symbols
+defined in these namespaces are also available as top-level imports.
+
+## Changes from Rust
 
 - All names use `camelCase` to follow JavaScript conventions.
 - Methods that panic in Rust throw errors.
@@ -21,7 +25,7 @@ it's easy to remember most of the based on a few patterns.
 - Methods like `copied` and `cloned`, which are specific to Rust's type system,
   have been omitted.
 
-### New Functions
+## Functions not in Rust
 
 - The top-level `Some`, `None`, `Ok`, and `Err` functions have corresponding
   funtions with more precised signatured named `constSome`, `constNone`,
@@ -38,7 +42,7 @@ it's easy to remember most of the based on a few patterns.
 - The `andThen` methods are aliased as `flatMap` for consistency with JavaScript
   APIs.
 
-### Changed Methods
+## Changed Methods
 
 - The `expect` and `expectErr` methods can accept a function returning a string
   in addition to a plain string.

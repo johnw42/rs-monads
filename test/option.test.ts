@@ -1,30 +1,39 @@
 import {
+  Err,
+  None,
+  Ok,
+  Option,
+  Result,
+  Some,
   constNone,
   constSome,
   isOption,
-  None,
-  Option,
-  Some,
-} from "../src/Option";
-import { Err, Ok, Result } from "../src/Result";
+} from "../src/index";
+import {
+  SameType,
+  anObject,
+  anotherObject,
+  isEq,
+  isZero,
+  notCalled,
+  thirdObject,
+} from "./utils";
 
-const anObject = { a: 0 };
-const anotherObject = { b: 1 };
-const thirdObject = { c: 2 };
-
-function notCalled(...args: any[]): never {
-  throw Error("Called notCalled");
-}
-
-function isZero(n: number): boolean {
-  return n === 0;
-}
-
-function isEq(lhs: unknown): (rhs: unknown) => boolean {
-  return (rhs) => lhs === rhs;
-}
+type T = typeof anObject;
 
 describe("functions", () => {
+  test("aliases", () => {
+    const ok: SameType<Option.Some<T>, Some<T>> = constSome(anObject);
+    const err: SameType<Option.None<T>, None<T>> = constNone();
+    void ok;
+    void err;
+    expect(Option.Some).toBe(Some);
+    expect(Option.None).toBe(None);
+    expect(Option.constSome).toBe(constSome);
+    expect(Option.constNone).toBe(constNone);
+    expect(Option.isOption).toBe(isOption);
+  });
+
   test("fromNullable", () => {
     expect(Option.fromNullable(null).isNone()).toBe(true);
     expect(Option.fromNullable(undefined).isNone()).toBe(true);
