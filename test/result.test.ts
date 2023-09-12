@@ -211,6 +211,10 @@ describe("Ok", () => {
     expect(await Ok(anObject).toPromise()).toBe(anObject);
   });
 
+  test("toString", () => {
+    expect(Ok(42).toString()).toBe("Ok(42)");
+  });
+
   test("@iterator", () => {
     expect(Array.from(Ok(anObject))).toEqual([anObject]);
   });
@@ -343,6 +347,10 @@ describe("Err", () => {
     } catch (error) {
       expect(error).toBe(anObject);
     }
+  });
+
+  test("toString", () => {
+    expect(Err(42).toString()).toBe("Err(42)");
   });
 
   test("@iterator", () => {

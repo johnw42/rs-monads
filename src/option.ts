@@ -183,6 +183,10 @@ class SomeImpl<T> implements IOption<T> {
   [Symbol.iterator](): Iterator<T> {
     return [this.value].values();
   }
+
+  toString(): string {
+    return `Some(${this.value})`;
+  }
 }
 
 class NoneImpl<T> implements IOption<T> {
@@ -288,6 +292,10 @@ class NoneImpl<T> implements IOption<T> {
 
   [Symbol.iterator](): Iterator<T> {
     return [].values();
+  }
+
+  toString(): string {
+    return "None()";
   }
 }
 

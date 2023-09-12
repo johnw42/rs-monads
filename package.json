@@ -1,7 +1,7 @@
 {
   "author": "John Williams <jrw@pobox.com>",
   "bugs": {
-    "url": "https://github.com/johnw42/light-option/issues"
+    "url": "https://github.com/johnw42/rs-opt/issues"
   },
   "description": "My webpack project",
   "devDependencies": {
@@ -23,7 +23,7 @@
   "files": [
     "lib/**/*"
   ],
-  "homepage": "https://github.com/johnw42/light-option",
+  "homepage": "https://github.com/johnw42/rs-opt",
   "husky": {
     "hooks": {
       "pre-commit": "yarn lint",
@@ -34,11 +34,11 @@
   "license": "MIT",
   "main": "lib/cjs/index.js",
   "module": "lib/esm/index.js",
-  "name": "light-option",
+  "name": "rs-opt",
   "packageManager": "yarn@3.6.3",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/johnw42/light-option.git"
+    "url": "git+https://github.com/johnw42/rs-opt.git"
   },
   "scripts": {
     "build": "webpack --mode=production --node-env=production",

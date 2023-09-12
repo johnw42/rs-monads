@@ -77,15 +77,13 @@ export const Result = {
    * `Ok(x)`, and converts a promise that rejects with `x` to a promise that
    * resolves to `Err(x)`.
    */
-  fromPromise<T>(
-    promise: Promise<T>,
-  ): Promise<Result<T, unknown>> {
+  fromPromise<T>(promise: Promise<T>): Promise<Result<T, unknown>> {
     return promise.then(
       (value) => Ok(value),
       (error) => Err(error),
     );
-  }
-}
+  },
+};
 
 class OkImpl<T, E> implements IResult<T, E> {
   constructor(
@@ -179,12 +177,16 @@ class OkImpl<T, E> implements IResult<T, E> {
     return this;
   }
 
+  toPromise(): Promise<T> {
+    return Promise.resolve(this.value);
+  }
+
   [Symbol.iterator](): Iterator<T> {
     return [this.value].values();
   }
 
-  toPromise(): Promise<T> {
-    return Promise.resolve(this.value);
+  toString(): string {
+    return `Ok(${this.value})`;
   }
 }
 
@@ -280,11 +282,15 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return d(this.error);
   }
 
+  toPromise(): Promise<T> {
+    return Promise.reject(this.error);
+  }
+
   [Symbol.iterator](): Iterator<T> {
     return [].values();
   }
 
-  toPromise(): Promise<T> {
-    return Promise.reject(this.error);
+  toString(): string {
+    return `Err(${this.error})`;
   }
 }

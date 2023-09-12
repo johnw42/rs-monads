@@ -264,6 +264,10 @@ describe("Some", () => {
   test("@iterator", () => {
     expect(Array.from(Some(anObject))).toEqual([anObject]);
   });
+
+  test("toString", () => {
+    expect(Some(42).toString()).toBe("Some(42)");
+  });
 });
 
 describe("None", () => {
@@ -387,5 +391,9 @@ describe("None", () => {
 
   test("@iterator", () => {
     expect(Array.from(None())).toEqual([]);
+  });
+
+  test("toString", () => {
+    expect(None().toString()).toBe("None()");
   });
 });
