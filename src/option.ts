@@ -9,9 +9,10 @@ export type Some<T> = SomeImpl<T>;
 export type None<T> = NoneImpl<T>;
 
 /**
- * Returns an instance of `Some` whose value is `value`.  The return value uses
- * `Option` rather than `Some` to avoid constraining the type of variables
- * initialize by a call to this function.
+ * Returns an instance of `Some` whose value is `value`.
+ *
+ * The return type uses `Option` rather than `Some` to avoid constraining the
+ * type of variables initialized by a call to this function.
  *
  * @see {@link constSome}
  */
@@ -20,9 +21,10 @@ export function Some<T>(value: T): Option<T> {
 }
 
 /**
- * Returns an instance of `None`.  The return value uses `Option` rather than
- * `None` to avoid constraining the type of variables initialize by a call to
- * this function.
+ * Returns an instance of `None`.
+ *
+ * The return type uses `Option` rather than `None` to avoid constraining the
+ * type of variables initialized by a call to this function.
  *
  * @see {@link constNone}
  */
@@ -67,17 +69,13 @@ export const Option = {
 };
 
 export namespace Option {
-  /**
-   * Subtype of `Option<T>` that contains a value.
-   */
   export type Some<T> = SomeImpl<T>;
-
-  /**
-   * Subtype of `Option<T>` that contains no value..
-   */
   export type None<T> = NoneImpl<T>;
 }
 
+/**
+ * The interface implemented by {@link Option}.
+ */
 interface IOption<T> extends Iterable<T> {
   /**
    * Tests whether `this` is `Some(_)`.
@@ -243,6 +241,9 @@ interface IOption<T> extends Iterable<T> {
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E>;
 }
 
+/**
+ * The implemention of values returned by {@link Some}.
+ */
 class SomeImpl<T> implements IOption<T> {
   constructor(
     /**
@@ -374,7 +375,9 @@ class SomeImpl<T> implements IOption<T> {
     return `Some(${this.value})`;
   }
 }
-
+/**
+ * The implemention values returned by {@link None}.
+ */
 class NoneImpl<T> implements IOption<T> {
   isSome(): false {
     return false;

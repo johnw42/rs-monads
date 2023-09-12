@@ -12,7 +12,7 @@ export type Err<T, E> = ErrImpl<T, E>;
 /**
  * Returns an instance of `Ok` whose value is `value`.  The return value uses
  * `Result` rather than `Ok` to avoid constraining the type of variables
- * initialize by a call to this function.
+ * initialized by a call to this function.
  *
  * @see {@link constOk}
  */
@@ -23,7 +23,7 @@ export function Ok<T, E>(value: T): Result<T, E> {
 /**
  * Returns an instance of `Err` whose value is `error`.  The return value uses
  * `Result` rather than `Err` to avoid constraining the type of variables
- * initialize by a call to this function.
+ * initialized by a call to this function.
  *
  * @see {@link constErr}
  */
@@ -86,17 +86,13 @@ export const Result = {
 };
 
 export namespace Result {
-  /**
-   * Subtype of `Result<T, E>` that contains a success value of type `T`.
-   */
   export type Ok<T, E> = OkImpl<T, E>;
-
-  /**
-   * Subtype of `Result<T, E>` that contains an error value of type `E`.
-   */
   export type Err<T, E> = ErrImpl<T, E>;
 }
 
+/**
+ * The interface implemented by {@link Result}.
+ */
 interface IResult<T, E> extends Iterable<T> {
   /**
    * Tests whether `this` is `Ok(_)`.
@@ -251,6 +247,9 @@ interface IResult<T, E> extends Iterable<T> {
   toPromise(): Promise<T>;
 }
 
+/**
+ * The implemention of the {@link Ok} type.
+ */
 class OkImpl<T, E> implements IResult<T, E> {
   constructor(
     /**
@@ -375,6 +374,9 @@ class OkImpl<T, E> implements IResult<T, E> {
   }
 }
 
+/**
+ * The implementation of the {@link Err} type.
+ */
 class ErrImpl<T, E> implements IResult<T, E> {
   constructor(
     /**
