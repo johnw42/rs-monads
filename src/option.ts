@@ -169,6 +169,10 @@ interface IOption<T> extends Iterable<T> {
   mapNullable<R>(f: (value: T) => R | undefined | null): Option<NonNullable<R>>;
 
   /**
+   * If `this` is `Some(x)`, returns `onSome(x)`, otherwise returns `onNone()`.
+   */
+  match<R>(onSome: (value: T) => R, onNone: () => R): R;
+  /**
    * If `this` is `Some(x)`, calls `m.Some(x)`.
    */
   match<R>(m: Pick<Matcher<T, R>, "Some">): void;
@@ -325,12 +329,18 @@ class SomeImpl<T> implements IOption<T> {
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
     return f(this.value);
   }
-
+  
+  match<R>(onSome: (value: T) => R, onNone: () => R): R;
   match<R>(m: Pick<Matcher<T, R>, "Some">): void;
   match<R>(m: Pick<Matcher<T, R>, "None">): void;
   match<R>(m: Matcher<T, R>): R;
-  match<R>(m: Partial<Matcher<T, R>>): void | R {
-    if (m.Some) {
+  match<R>(
+    m: Partial<Matcher<T, R>> | ((value: T) => R),
+    onNone?: () => R,
+  ): void | R {
+    if (typeof m === "function") {
+      return m(this.value);
+    } else if (m.Some) {
       const r = m.Some(this.value);
       return m.None ? r : undefined;
     }
@@ -461,11 +471,17 @@ class NoneImpl<T> implements IOption<T> {
     return d();
   }
 
+  match<R>(onSome: (value: T) => R, onNone: () => R): R;
   match<R>(m: Pick<Matcher<T, R>, "Some">): void;
   match<R>(m: Pick<Matcher<T, R>, "None">): void;
   match<R>(m: Matcher<T, R>): R;
-  match<R>(m: Partial<Matcher<T, R>>): void | R {
-    if (m.None) {
+  match<R>(
+    m: Partial<Matcher<T, R>> | ((value: T) => R),
+    onNone?: () => R,
+  ): void | R {
+    if (typeof m === "function") {
+      return onNone!();
+    } else if (m.None) {
       const r = m.None();
       return m.Some ? r : undefined;
     }

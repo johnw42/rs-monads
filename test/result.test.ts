@@ -198,10 +198,11 @@ describe("Ok", () => {
   });
 
   test("match", () => {
-    const okFunc = jest.fn((value: T) => {
-      expect(value).toBe(anObject);
-      return thirdObject;
-    });
+    const okFunc = jest.fn(expectArg(anObject, thirdObject));
+
+    expect(Ok(anObject).match(okFunc, notCalled) satisfies R).toBe(
+      thirdObject,
+    );
 
     expect(
       Ok(anObject).match({
@@ -220,7 +221,7 @@ describe("Ok", () => {
       undefined,
     );
 
-    expect(okFunc.mock.calls.length).toBe(2);
+    expect(okFunc.mock.calls.length).toBe(3);
   });
 
   test("and", () => {
@@ -400,6 +401,8 @@ describe("Err", () => {
   test("match", () => {
     const errFunc = jest.fn(expectArg(anotherObject, thirdObject));
 
+    expect(Err(anotherObject).match(notCalled, errFunc) satisfies R).toBe(thirdObject);
+
     expect(
       Err(anotherObject).match({
         Ok: notCalled,
@@ -417,7 +420,7 @@ describe("Err", () => {
       undefined,
     );
 
-    expect(errFunc.mock.calls.length).toBe(2);
+    expect(errFunc.mock.calls.length).toBe(3);
   });
 
   test("and", () => {

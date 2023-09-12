@@ -60,7 +60,7 @@ export const Result = {
   isResult,
 
   /**
-   * Returns `Ok(x)` if `f()` returns `x`, or `Err(x)` of `f()` throws `x`.
+   * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
    *
    * Its approximate inverse is {@link Option#unwrap}.
    */
@@ -74,8 +74,8 @@ export const Result = {
 
   /**
    * Converts a promise that resolves to `x` into a promise that resolves to
-   * `Ok(x)`, and converts a promise that rejects with `x` to a promise that
-   * resolves to `Err(x)`.
+   * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
+   * resolves to `Err(e)`.
    */
   fromPromise<T>(promise: Promise<T>): Promise<Result<T, unknown>> {
     return promise.then(
@@ -115,7 +115,7 @@ interface IResult<T, E> extends Iterable<T> {
   isErr(): this is Err<T, E>;
 
   /**
-   * Tests whether `this` is an `Err(x)` for which `p(x)` is a truthy value.
+   * Tests whether `this` is an `Err(e)` for which `p(e)` is a truthy value.
    */
   isErrAnd(p: (error: E) => unknown): this is Err<T, E>;
 
@@ -126,7 +126,7 @@ interface IResult<T, E> extends Iterable<T> {
   expect(message: string | (() => string)): T;
 
   /**
-   * If `this` is `Err(x)`, returns `x`, otherwise throws `Error(message)`
+   * If `this` is `Err(e)`, returns `e`, otherwise throws `Error(message)`
    * or `Error(message())`.
    */
   expectErr(message: string | (() => string)): E;
@@ -134,7 +134,7 @@ interface IResult<T, E> extends Iterable<T> {
   /**
    * If `this` is `Ok(x)`, returns `x`, otherwise throws an error. If
    * `errorFactory` is provided, it is called to generate the value to be
-   * thrown; otherise throws `x` where `this` is `Err(x)`.
+   * thrown; otherise throws `e` where `this` is `Err(e)`.
    */
   unwrap(errorFactory?: () => unknown): T;
 
@@ -154,14 +154,14 @@ interface IResult<T, E> extends Iterable<T> {
   unwrapUnchecked(): T;
 
   /**
-   * If `this` is `Err(x)`, returns `x`, otherwise throws an error. If
+   * If `this` is `Err(e)`, returns `e`, otherwise throws an error. If
    * `ErrorFactory` is provided, it is called to generate the value to be
    * thrown.
    */
   unwrapErr(errorFactory?: () => unknown): E;
 
   /**
-   * If `this` is `Err(x)`, returns `x`, otherwise returns `undefined as E`.
+   * If `this` is `Err(e)`, returns `e`, otherwise returns `undefined as E`.
    */
   unwrapErrUnchecked(): E;
 
@@ -171,7 +171,7 @@ interface IResult<T, E> extends Iterable<T> {
   ok(): Option<T>;
 
   /**
-   * If `this` is `Err(x)`, returns `Some(x)`, otherwise returns `None()`.
+   * If `this` is `Err(e)`, returns `Some(e)`, otherwise returns `None()`.
    */
   err(): Option<E>;
 
@@ -193,21 +193,25 @@ interface IResult<T, E> extends Iterable<T> {
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): D | R;
 
   /**
-   * If `this` is `Err(x)`, returns `Err(f(x))`, otherwise returns
+   * If `this` is `Err(e)`, returns `Err(f(e))`, otherwise returns
    * `this`.
    */
   mapErr<R>(f: (error: E) => R): Result<T, R>;
 
   /**
+   * If `this` is `Ok(x)`, returns `onOk(x)`, otherwise returns `onErr(e)` where `this` is `Err(e)`.
+   */
+  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
+  /**
    * If `this` is `Ok(x)`, calls `m.Ok(x)`.
    */
   match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
   /**
-   * If `this` is `Err(x)`, calls `m.Err(x)`.
+   * If `this` is `Err(e)`, calls `m.Err(e)`.
    */
   match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
   /**
-   * If `this` is `Ok(x)`, returns `m.Ok(x)`, otherwise returns `m.Err(x)`.
+   * If `this` is `Ok(x)`, returns `m.Ok(x)`, otherwise returns `m.Err(e)` where `this` is `Err(e)`.
    */
   match<R>(m: Matcher<T, E, R>): R;
 
@@ -247,14 +251,14 @@ interface IResult<T, E> extends Iterable<T> {
    *
    * `Ok(Some(x))` ↦ `Some(Ok(x))`
    *
-   * `Err(x)` ↦ `Some(Err(x))`
+   * `Err(e)` ↦ `Some(Err(e))`
    *
    */
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>>;
 
   /**
    * If `this` is `Ok(x)`, returns a promise that resolves to `x`; if `this` is
-   * `Err(x)`, returns a promise that rejects with `x`.
+   * `Err(e)`, returns a promise that rejects with `e`.
    */
   toPromise(): Promise<T>;
 }
@@ -342,11 +346,17 @@ class OkImpl<T, E> implements IResult<T, E> {
     return this as unknown as Ok<T, R>;
   }
 
+  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
   match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
   match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
   match<R>(m: Matcher<T, E, R>): R;
-  match<R>(m: Partial<Matcher<T, E,  R>>): void | R {
-    if (m.Ok) {
+  match<R>(
+    m: Partial<Matcher<T, E, R>> | ((value: T) => R),
+    onErr?: (error: E) => R,
+  ): void | R {
+    if (typeof m === "function") {
+      return m(this.value);
+    } else if (m.Ok) {
       const r = m.Ok(this.value);
       return m.Err ? r : undefined;
     }
@@ -375,10 +385,10 @@ class OkImpl<T, E> implements IResult<T, E> {
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
     return this.unwrapUnchecked().match({
       Some(value) {
-        return Some(Ok<T,E>(value));
+        return Some(Ok<T, E>(value));
       },
       None() {
-        return None<Result<T,E>>();
+        return None<Result<T, E>>();
       },
     });
   }
@@ -479,11 +489,17 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return new ErrImpl(f(this.error));
   }
 
+  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
   match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
   match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
   match<R>(m: Matcher<T, E, R>): R;
-  match<R>(m: Partial<Matcher<T, E, R>>): void | R {
-    if (m.Err) {
+  match<R>(
+    m: Partial<Matcher<T, E, R>> | ((value: T) => R),
+    onErr?: (error: E) => R,
+  ): void | R {
+    if (typeof m === "function") {
+      return onErr!(this.error);
+    } else if (m.Err) {
       const r = m.Err(this.error);
       return m.Ok ? r : undefined;
     }
