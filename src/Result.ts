@@ -1,4 +1,4 @@
-import { None, Option, Some, constNone, constSome } from "./Option";
+import { None, Option, Some, constNone, constSome } from "./_Option";
 
 /**
  * A type that can contain a succes value of type `T` or an error value of type
