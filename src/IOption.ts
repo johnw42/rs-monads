@@ -43,6 +43,11 @@ export interface IOption<T> extends Iterable<T> {
   unwrapOrElse<R>(d: () => R): T | R;
 
   /**
+   * If `this` is `Some(x)`, returns `x`, otherwise returns `undefined as T`.
+   */
+  unwrapUnchecked(): T;
+
+  /**
    * If `this` is `Some(x)`, returns `x`, otherwise returns `undefined`.
    * 
    * Equivalent to `this.unwrapOr(undefined)`.

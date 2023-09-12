@@ -103,11 +103,19 @@ describe("Ok", () => {
     expect(Ok(anObject).unwrapOrElse(notCalled)).toBe(anObject);
   });
 
+  test("unwrapUnchecked", () => {
+    expect(Ok(anObject).unwrapUnchecked()).toBe(anObject);
+  });
+
   test("unwrapErr", () => {
     expect(() => Ok(anObject).unwrapErr()).toThrow(Error);
     expect(() => Ok(anObject).unwrapErr(() => new Error("xyzzy"))).toThrow(
       "xyzzy",
     );
+  });
+
+  test("unwrapErrUnchecked", () => {
+    expect(Ok(anObject).unwrapErrUnchecked()).toBe(undefined);
   });
 
   test("ok", () => {
@@ -275,9 +283,17 @@ describe("Err", () => {
     expect(Err(anObject).unwrapOrElse(() => anotherObject)).toBe(anotherObject);
   });
 
-  test("unwrap", () => {
+  test("unwrapUnchecked", () => {
+    expect(Err(anObject).unwrapUnchecked()).toBe(undefined);
+  });
+
+  test("unwrapErr", () => {
     expect(Err(anObject).unwrapErr()).toBe(anObject);
     expect(Err(anObject).unwrapErr(notCalled)).toBe(anObject);
+  });
+
+  test("unwrapUnchecked", () => {
+    expect(Err(anObject).unwrapErrUnchecked()).toBe(anObject);
   });
 
   test("ok", () => {

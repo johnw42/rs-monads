@@ -104,6 +104,10 @@ describe("Some", () => {
     expect(Some(anObject).unwrapOrElse(notCalled)).toBe(anObject);
   });
 
+  test("unwrapUnchecked", () => {
+    expect(Some(anObject).unwrapUnchecked()).toBe(anObject);
+  });
+
   test("toNullable", () => {
     expect(Some(anObject).toNullable()).toBe(anObject);
   });
@@ -305,6 +309,10 @@ describe("None", () => {
 
   test("unwrapOrElse", () => {
     expect(None().unwrapOrElse(() => anotherObject)).toBe(anotherObject);
+  });
+
+  test("unwrapUnchecked", () => {
+    expect(None().unwrapUnchecked()).toBe(undefined);
   });
 
   test("toNullable", () => {

@@ -125,8 +125,16 @@ class OkImpl<T, E> implements IResult<T, E> {
     return this.value;
   }
 
+  unwrapUnchecked(): T {
+    return this.value;
+  }
+
   unwrapErr(errorFactory?: () => unknown): E {
     throw errorFactory ? errorFactory() : Error("Missing error value");
+  }
+
+  unwrapErrUnchecked(): E {
+    return undefined as E;
   }
 
   ok(): Some<T> {
@@ -178,7 +186,7 @@ class OkImpl<T, E> implements IResult<T, E> {
   }
 
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
-    return this.unwrap().match(
+    return this.unwrapUnchecked().match(
       (value: T) => Some(Ok(value)),
       () => None(),
     );
@@ -237,7 +245,15 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return d(this.error);
   }
 
+  unwrapUnchecked(): T {
+    return undefined as T;
+  }
+
   unwrapErr(errorFactory?: () => unknown): E {
+    return this.error;
+  }
+
+  unwrapErrUnchecked(): E {
     return this.error;
   }
 
@@ -290,7 +306,7 @@ class ErrImpl<T, E> implements IResult<T, E> {
   }
 
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
-    return Some(Err(this.unwrapErr()));
+    return Some(Err(this.unwrapErrUnchecked()));
   }
 
   toPromise(): Promise<T> {

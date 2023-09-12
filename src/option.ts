@@ -104,6 +104,10 @@ class SomeImpl<T> implements IOption<T> {
     return this.value;
   }
 
+  unwrapUnchecked(): T {
+    return this.value;
+  }
+
   toNullable(): T {
     return this.value;
   }
@@ -177,11 +181,11 @@ class SomeImpl<T> implements IOption<T> {
   }
 
   flatten<T>(this: Option<Option<T>>): Option<T> {
-    return (this as SomeImpl<Option<T>>).value;
+    return this.unwrapUnchecked();
   }
 
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
-    return this.unwrap().match(
+    return this.unwrapUnchecked().match(
       (value: T) => Ok(constSome(value)),
       (error: E) => Err(error),
     );
@@ -223,6 +227,10 @@ class NoneImpl<T> implements IOption<T> {
 
   unwrapOrElse<R>(f: () => R): R {
     return f();
+  }
+
+  unwrapUnchecked(): T {
+    return undefined as T;
   }
 
   toNullable(): undefined {

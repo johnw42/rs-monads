@@ -46,11 +46,21 @@ export interface IResult<T, E> extends Iterable<T> {
   unwrapOrElse<R>(d: (error: E) => R): T | R;
 
   /**
+   * If `this` is `Ok(x)`, returns `x`, otherwise returns `undefined as T`.
+   */
+  unwrapUnchecked(): T;
+
+  /**
    * If `this` is `Err(x)`, returns `x`, otherwise throws an error. If
    * `ErrorFactory` is provided, it is called to generate the value to be
    * thrown.
    */
   unwrapErr(errorFactory?: () => unknown): E;
+
+  /**
+   * If `this` is `Err(x)`, returns `x`, otherwise returns `undefined as E`.
+   */
+  unwrapErrUnchecked(): E;
 
   /**
    * If `this` is `Ok(x)`, returns `Some(x)`, otherwise returns `None()`.
