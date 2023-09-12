@@ -1,2 +1,2 @@
-export * from "./_Option";
+export * from "./Option";
 export * from "./Result";
