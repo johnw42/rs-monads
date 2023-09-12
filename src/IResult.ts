@@ -30,7 +30,7 @@ export interface IResult<T, E> extends Iterable<T> {
 
   /**
    * If `this` is `Ok(x)`, returns `x`, otherwise throws an error. If
-   * `ErrorFactory` is provided, it is called to generate the value to be
+   * `errorFactory` is provided, it is called to generate the value to be
    * thrown; otherise throws `x` where `this` is `Err(x)`.
    */
   unwrap(errorFactory?: () => unknown): T;
