@@ -91,10 +91,10 @@ describe("Ok", () => {
   });
 
   test("expectErr", () => {
-    const error1: any = Ok(anObject).expectErr("xyzzy");
+    const error1: any = Result.try(() => Ok(anObject).expectErr("xyzzy")).unwrapErr();
     expect(error1).toBeInstanceOf(Error);
     expect(error1.message).toBe("xyzzy");
-    const error2: any = Ok(anObject).expectErr(() => "xyzzy");
+    const error2: any = Result.try(() => Ok(anObject).expectErr(() => "xyzzy")).unwrapErr();
     expect(error2).toBeInstanceOf(Error);
     expect(error2.message).toBe("xyzzy");
   });
@@ -273,10 +273,10 @@ describe("Err", () => {
   });
 
   test("expect", () => {
-    const error1: any = Err(anObject).expect("xyzzy");
+    const error1: any = Result.try(() => Err(anObject).expect("xyzzy")).unwrapErr();
     expect(error1).toBeInstanceOf(Error);
     expect(error1.message).toBe("xyzzy");
-    const error2: any = Err(anObject).expect(() => "xyzzy");
+    const error2: any = Result.try(() => Err(anObject).expect(() => "xyzzy")).unwrapErr();
     expect(error2).toBeInstanceOf(Error);
     expect(error2.message).toBe("xyzzy");
   });

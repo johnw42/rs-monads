@@ -214,7 +214,7 @@ class NoneImpl<T> implements IOption<T> {
   }
 
   expect(message: string | (() => string)): never {
-    throw typeof message === "string" ? message : message();
+    throw Error(typeof message === "string" ? message : message());
   }
 
   unwrap(errorFactory?: () => unknown): never {
