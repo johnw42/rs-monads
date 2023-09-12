@@ -41,8 +41,7 @@
     "url": "git+https://github.com/johnw42/rs-opt.git"
   },
   "scripts": {
-    "build": "webpack --mode=production --node-env=production",
-    "rollup": "rollup -c rollup.config.js",
+    "build": "rollup -c rollup.config.js",
     "test": "jest",
     "lint": "eslint src/*.ts",
     "prepare": "husky install"
