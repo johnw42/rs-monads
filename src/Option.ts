@@ -90,7 +90,7 @@ interface IOption<T> extends Iterable<T> {
   /**
    * Tests whether `this` is a `Some(x)` for which `p(x)` is a truthy value.
    */
-  isSomeAnd(p: (value: T) => unknown): this is Some<T>;
+  isSomeAnd(p: (value: T) => unknown): boolean;
 
   /**
    * Tests whether `this` is `None()`.
@@ -98,8 +98,11 @@ interface IOption<T> extends Iterable<T> {
   isNone(): this is None<T>;
 
   /**
-   * If `this` is `Some(x)`, returns `x`, otherwise throws `Error(message)`
-   * or `Error(message())`.
+   * If `this` is `Some(x)`, returns `x`, otherwise throws `Error(message)` or
+   * `Error(message())`.
+   *
+   * For the sake of clarity, the message should typically contain the word
+   * "should".
    */
   expect(message: string | (() => string)): T;
 
@@ -132,7 +135,7 @@ interface IOption<T> extends Iterable<T> {
    *
    * Equivalent to `this.unwrapOr(undefined)`.
    */
-  toNullable(): T | undefined;
+  toNullable<T1 extends NonNullable<T>>(this: Option<T1>): T1 | undefined;
 
   /**
    * If `this` is `Some(x)`, returns `Ok(x)`, otherwise returns `Err(error)`.
@@ -249,11 +252,9 @@ interface IOption<T> extends Iterable<T> {
   /**
    * Performs the following translation:
    *
-   * `None()` ↦ `Ok(None())`
-   *
-   * `Some(Ok(x))` ↦ `Ok(Some(x))`
-   *
-   * `Some(Err(x))` ↦ `Err(x)`
+   * - `None()` ↦ `Ok(None())`
+   * - `Some(Ok(x))` ↦ `Ok(Some(x))`
+   * - `Some(Err(x))` ↦ `Err(x)`
    *
    * It is the inverse of {@link Result#transpose}
    */
@@ -275,7 +276,7 @@ class SomeImpl<T> implements IOption<T> {
     return true;
   }
 
-  isSomeAnd(p: (value: T) => unknown): this is Some<T> {
+  isSomeAnd(p: (value: T) => unknown): boolean {
     return Boolean(p(this.value));
   }
 
@@ -303,8 +304,8 @@ class SomeImpl<T> implements IOption<T> {
     return this.value;
   }
 
-  toNullable(): T {
-    return this.value;
+  toNullable<T1 extends NonNullable<T>>(this: Option<T1>): T1 {
+    return this.unwrapUnchecked();
   }
 
   okOr<E>(error: E): Ok<T, E> {
@@ -446,7 +447,7 @@ class NoneImpl<T> implements IOption<T> {
     return undefined as T;
   }
 
-  toNullable(): undefined {
+  toNullable<T1 extends NonNullable<T>>(this: Option<T1>): undefined {
     return undefined;
   }
 

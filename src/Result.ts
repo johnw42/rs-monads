@@ -107,7 +107,7 @@ interface IResult<T, E> extends Iterable<T> {
   /**
    * Tests whether `this` is an `Ok(x)` for which `p(x)` is a truthy value.
    */
-  isOkAnd(p: (value: T) => unknown): this is Ok<T, E>;
+  isOkAnd(p: (value: T) => unknown): boolean;
 
   /**
    * Tests whether `this` does not contain a value.
@@ -117,17 +117,23 @@ interface IResult<T, E> extends Iterable<T> {
   /**
    * Tests whether `this` is an `Err(e)` for which `p(e)` is a truthy value.
    */
-  isErrAnd(p: (error: E) => unknown): this is Err<T, E>;
+  isErrAnd(p: (error: E) => unknown): boolean;
 
   /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise throws `Error(message)`
-   * or `Error(message())`.
+   * If `this` is `Ok(x)`, returns `x`, otherwise throws `Error(message)` or
+   * `Error(message())`.
+   *
+   * For the sake of clarity, the message should typically contain the word
+   * "should".
    */
   expect(message: string | (() => string)): T;
 
   /**
    * If `this` is `Err(e)`, returns `e`, otherwise throws `Error(message)`
    * or `Error(message())`.
+   *
+   * For the sake of clarity, the message should typically contain the word
+   * "should".
    */
   expectErr(message: string | (() => string)): E;
 
@@ -283,7 +289,7 @@ class OkImpl<T, E> implements IResult<T, E> {
     return true;
   }
 
-  isOkAnd(p: (value: T) => unknown): this is Ok<T, E> {
+  isOkAnd(p: (value: T) => unknown): boolean {
     return Boolean(p(this.value));
   }
 
@@ -430,7 +436,7 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return true;
   }
 
-  isErrAnd(p: (error: E) => unknown): this is Err<T, E> {
+  isErrAnd(p: (error: E) => unknown): boolean {
     return Boolean(p(this.error));
   }
 

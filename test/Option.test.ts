@@ -134,7 +134,7 @@ describe("Option methods", () => {
 
   test("toNullable", () => {
     expect(Some(theT).toNullable()).toBe(theT);
-    expect(None().toNullable()).toBe(undefined);
+    expect(None<T>().toNullable()).toBe(undefined);
   });
 
   test("okOr", () => {
