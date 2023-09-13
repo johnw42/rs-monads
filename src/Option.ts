@@ -111,10 +111,10 @@ export function unwrapFields<R extends object>(
 }
 
 /**
- * Returns `Some(value)` unless `value` is null or undefined; otherwise returns `None()`.
+ * Returns `Some(nullable)` unless `nullable` is null or undefined; otherwise returns `None()`.
  */
-export function fromNullable<T>(value: T): Option<NonNullable<T>> {
-  return value == null ? None<NonNullable<T>>() : Some(value);
+export function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
+  return nullable == null ? None<NonNullable<T>>() : Some(nullable);
 }
 
 export const Option = {
@@ -270,8 +270,15 @@ interface IOption<T> extends Iterable<T> {
    * If `this` is `Some(x)`, returns `x`, otherwise returns `undefined`.
    *
    * Equivalent to `this.unwrapOr(undefined)`.
+   *
+   * @see {@link mapOrUndef}
    */
-  toNullable<T1 extends NonNullable<T>>(this: Option<T1>): T1 | undefined;
+  unwrapOrUndef(): T | undefined;
+
+  /**
+   * Alias of {@link unwrapOrUndef}.
+   */
+  toNullable(): T | undefined;
 
   /**
    * If `this` is `Some(x)`, returns `Ok(x)`, otherwise returns `Err(error)`.
@@ -298,34 +305,42 @@ interface IOption<T> extends Iterable<T> {
   /**
    * If `this` is `Some(x)`, returns `f(x)`, otherwise returns
    * `d()`.
+   *
+   * @see {@link matchSome}, {@link matchNone}
    */
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): D | R;
 
   /**
-   * If `this` is `Some(x)`, returns `opt(f(x))`, otherwise returns
+   * If `this` is `Some(x)`, returns `f(x)`, otherwise returns
+   * `undefined`.
+   *
+   * Equivalent to `this.map(f).toNullable()`.
+   */
+  mapOrUndef<R>(f: (value: T) => R): R | undefined;
+
+  /**
+   * If `this` is `Some(x)`, returns `fromNullable(f(x))`, otherwise returns
    * `None()`.
    */
   mapNullable<R>(f: (value: T) => R | undefined | null): Option<NonNullable<R>>;
 
   /**
-   * If `this` is `Some(x)`, returns `onSome(x)`, otherwise returns `onNone()`.
+   * Calls `f(x)` for its side effects if `this` is `Some(x)`.
    *
-   * Compared to the other signatures of this method, this one has the least
-   * overhead, and it works best with TypeScript's inference rules.
+   * Equivalent to `this.mapOrElse(() => {}, f)`.
+   *
+   * @see {@link matchNone}, {@link mapOrElse}
    */
-  match<R>(onSome: (value: T) => R, onNone: () => R): R;
+  matchSome(f: (value: T) => void): void;
+
   /**
-   * If `this` is `Some(x)`, calls `m.Some(x)`.
+   * Calls `f()` for its side effects if `this` is `None()`.
+   *
+   * Equivalent to `this.mapOrElse(f, () => {})`.
+   *
+   * @see {@link matchSome}, {@link mapOrElse}
    */
-  match<R>(m: Pick<Matcher<T, R>, "Some">): void;
-  /**
-   * If `this` is `None()`, calls `m.None()`.
-   */
-  match<R>(m: Pick<Matcher<T, R>, "None">): void;
-  /**
-   * If `this` is `Some(x)`, returns `m.Some(x)`, otherwise returns `m.None()`.
-   */
-  match<R>(m: Matcher<T, R>): R;
+  matchNone(f: () => void): void;
 
   /**
    * If `this` is `Some(_)`, returns `other`, otherwise returns
@@ -440,8 +455,12 @@ class SomeImpl<T> implements IOption<T> {
     return this.value;
   }
 
-  toNullable<T1 extends NonNullable<T>>(this: Option<T1>): T1 {
-    return this.unwrapUnchecked();
+  unwrapOrUndef(): T {
+    return this.value;
+  }
+
+  toNullable(): T {
+    return this.value;
   }
 
   okOr<E>(error: E): Ok<T, E> {
@@ -456,12 +475,6 @@ class SomeImpl<T> implements IOption<T> {
     return Some(f(this.value));
   }
 
-  mapNullable<R>(
-    f: (value: T) => R | undefined | null,
-  ): Option<NonNullable<R>> {
-    return Option.fromNullable(f(this.value));
-  }
-
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
     return f(this.value);
   }
@@ -470,21 +483,21 @@ class SomeImpl<T> implements IOption<T> {
     return f(this.value);
   }
 
-  match<R>(onSome: (value: T) => R, onNone: () => R): R;
-  match<R>(m: Pick<Matcher<T, R>, "Some">): void;
-  match<R>(m: Pick<Matcher<T, R>, "None">): void;
-  match<R>(m: Matcher<T, R>): R;
-  match<R>(
-    m: Partial<Matcher<T, R>> | ((value: T) => R),
-    onNone?: () => R,
-  ): void | R {
-    if (typeof m === "function") {
-      return m(this.value);
-    } else if (m.Some) {
-      const r = m.Some(this.value);
-      return m.None ? r : undefined;
-    }
+  mapOrUndef<R>(f: (value: T) => R): R {
+    return f(this.value);
   }
+
+  matchSome(f: (value: T) => void): void {
+    f(this.value);
+  }
+
+  mapNullable<R>(
+    f: (value: T) => R | undefined | null,
+  ): Option<NonNullable<R>> {
+    return Option.fromNullable(f(this.value));
+  }
+
+  matchNone(f: () => void): void {}
 
   and<U>(other: Option<U>): Option<U> {
     return other;
@@ -495,7 +508,7 @@ class SomeImpl<T> implements IOption<T> {
   }
 
   flatMap<R>(f: (value: T) => Option<R>): Option<R> {
-    return this.andThen(f);
+    return f(this.value);
   }
 
   filter(p: (value: T) => unknown): Option<T> {
@@ -529,13 +542,9 @@ class SomeImpl<T> implements IOption<T> {
   }
 
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
-    return this.unwrapUnchecked().match(
-      (value: T) => {
-        return Ok(constSome(value));
-      },
-      (error: E) => {
-        return Err(error);
-      },
+    return this.unwrapUnchecked().mapOrElse(
+      (error: E) => Err(error),
+      (value: T) => Ok(constSome(value)),
     );
   }
 
@@ -547,6 +556,7 @@ class SomeImpl<T> implements IOption<T> {
     return `Some(${this.value})`;
   }
 }
+
 /**
  * The implemention values returned by {@link None}.
  */
@@ -583,7 +593,11 @@ class NoneImpl<T> implements IOption<T> {
     return undefined as T;
   }
 
-  toNullable<T1 extends NonNullable<T>>(this: Option<T1>): undefined {
+  unwrapOrUndef(): undefined {
+    return undefined;
+  }
+
+  toNullable(): undefined {
     return undefined;
   }
 
@@ -599,10 +613,6 @@ class NoneImpl<T> implements IOption<T> {
     return constNone();
   }
 
-  mapNullable<R>(f: (value: T) => R): None<NonNullable<R>> {
-    return constNone();
-  }
-
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): D {
     return defaultValue;
   }
@@ -611,20 +621,18 @@ class NoneImpl<T> implements IOption<T> {
     return d();
   }
 
-  match<R>(onSome: (value: T) => R, onNone: () => R): R;
-  match<R>(m: Pick<Matcher<T, R>, "Some">): void;
-  match<R>(m: Pick<Matcher<T, R>, "None">): void;
-  match<R>(m: Matcher<T, R>): R;
-  match<R>(
-    m: Partial<Matcher<T, R>> | ((value: T) => R),
-    onNone?: () => R,
-  ): void | R {
-    if (typeof m === "function") {
-      return onNone!();
-    } else if (m.None) {
-      const r = m.None();
-      return m.Some ? r : undefined;
-    }
+  mapOrUndef<R>(f: (value: T) => R): undefined {
+    return undefined;
+  }
+
+  mapNullable<R>(f: (value: T) => R): None<NonNullable<R>> {
+    return constNone();
+  }
+
+  matchSome(f: (value: T) => void): void {}
+
+  matchNone(f: () => void): void {
+    f();
   }
 
   and<U>(other: Option<U>): None<U> {
@@ -636,7 +644,7 @@ class NoneImpl<T> implements IOption<T> {
   }
 
   flatMap<R>(f: (value: T) => Option<R>): None<R> {
-    return this.andThen(f);
+    return constNone();
   }
 
   filter(p: (value: T) => unknown): None<T> {

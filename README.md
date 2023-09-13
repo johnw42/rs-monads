@@ -1,9 +1,10 @@
 # rs-monads
 
-This package contains based heavily on Rust's main monad types: `Option` and
-`Result`.  Why use copy Rust APIs?  Aside from familiarity to Rust developers, I
-just like the way the Rust API is designed and I find the method names regular
-enough that it's easy to remember most of the based on a few patterns.
+This package contains types based heavily on Rust's main monad types: `Option`
+and `Result`.  Why use copy Rust APIs?  Aside from familiarity to Rust
+developers, I just like the way the Rust API is designed and I find the method
+names regular enough that it's easy to remember most of them based on a few
+patterns.
 
 
 
@@ -99,47 +100,48 @@ Creates an `Ok` value containing `x`.
 
 Creates an `Err` value containing `e`.
 
-**`constSome(x)`** (alias: `Option.constSome`)<br/>
-**`constNone(x)`** (alias: `Option.constNone`)<br/>
-**`constOk(x)`** (alias: `Option.constOk`)<br/>
+**`constSome(x)`** (alias: `Option.constSome`)  
+**`constNone(x)`** (alias: `Option.constNone`)  
+**`constOk(x)`** (alias: `Option.constOk`)  
 **`constErr(e)`** (alias: `Option.constErr`)
 
 Alternate versions of the similarly-named functions above with a more precise
 return type suitable for intializing constants.
 
-**`fromNullable(x)`** (alias: `Option.fromNullable`)
+**`fromNullable(x)`** (alias: `Option.fromNullable`)  
+**`fromNullableOr(def, x)`** (alias: `Result.fromNullableOr`)  
+**`fromNullableOrElse(lazyDef, x)`** (alias: `Result.fromNullableOrElse`)  
 
-Returns `None()` if `x` is null or undefined, otherwise returns `Some(x)`.
+Wraps the value `x` as `Some(x)` or `Ok(x)` unless `x` is `null` or `undefined`,
+in which case it returns `None()`, `Err(der)` or `Err(lazyDef())`.
 
 ### Extracting the contents of Option and Result values
 
-**`m.unwrap()`**<br/>
+**`m.unwrap()`**  
 **`m.expect("m should have a value")`**
 
 If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise throws an error. If `m`
 is `Err(e)`, `unwrap` throws `e`.
 
-**`m.unwrapOr(def)`**<br/>
+**`m.unwrapOr(def)`**  
 **`m.unwrapOrElse(lazyDef)`**
 
 If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise returns `def`  or
 `lazyDef()`.
 
-**`m.match(f, g)`**<br/>
-**`m.match({Some: f, None: g})`**<br/>
-**`m.match({Ok: f, Err: g})`**
+**`m.unwrapOrUndef()`**  
+**`m.toNullable()`**
 
-This method simulates a Rust `match` expression, calling `f(x)` for `Some(x)` or
-`Ok(x)`, `g()` for `None()`, or `g(e)` for `Err(e)`, and returning the result.
+These synonymous methods are the complement to `fromNullable`, `fromNullableOr`,
+and `fromNullableOrElse`. They are equivalent to `m.unwrapOr(undefined)`.
 
-In the second and third signatures, either `f` or `g` is omitted, in which case
-the remaining function is called for its side-effect,and the method returns
-`undefined`.
+**`m.matchSome(f)`**  
+**`m.matchNone(f)`**  
+**`m.matchOk(f)`**  
+**`m.matchErr(f)`**  
 
-**`m.toNullable()`** (`Option` only)
-
-This method is the complement to `Option.fromNullable`.  It converts `Some(x)`
-to `x` and `None()` to undefined.
+These methods call their argument for its side effects if `m` is `Some`, `None`,
+`Ok`, or `Err`, respectively.
 
 **`[...before, ...m, ...after]`**
 
@@ -147,24 +149,31 @@ The `Option` and `Result` types support the iterator protocol; `Some(x)` and
 `Ok(x)` yield one item, and `None()` and `Err(e)` yield no items.  This allowes
 optional values to be easily spliced into arrays.
 
+**Some(x).value**  
+**Ok(x).value**  
+**Err(e).error**
+
+These fields hold `x` or `e`. Use `isSome`, `isOk`, or `isErr` to check that
+they exist.
+
 ### Testing Option an Result values
 
-**`isOption(m)`** (alias: `Option.isOption`)<br/>
+**`isOption(m)`** (alias: `Option.isOption`)  
 **`isResult(m)`** (alias: `Result.isResult`)
 
 Tests whether `m` is an instance of `Option` (i.e. `Some` or `None`) or `Result`
 (i.e. `Ok` or `Err`), respectively.
 
-**`m.isSome()`**<br/>
-**`m.isNone()`**<br/>
-**`m.isOk()`**<br/>
+**`m.isSome()`**  
+**`m.isNone()`**  
+**`m.isOk()`**  
 **`m.isErr()`**
 
 Tests whether `m` is an instance of `Some`, `None`, `Ok`, or `Err`,
 respectively.
 
-**`m.isSomeAnd(p)`**<br/>
-**`m.isOkAnd(p)`**<br/>
+**`m.isSomeAnd(p)`**  
+**`m.isOkAnd(p)`**  
 **`m.isErrAnd(p)`**
 
 Tests whether `m` is an instance of `Some`, `Ok`, or `Err`, respectively and its
@@ -182,69 +191,58 @@ Analogous to `Array.map`; applies `f` to transform the the inner value of a
 * `None()` ↦ `None()`
 * `Err(e)` ↦ `Err(e)`
 
-**`m.andThen(f)`**<br/>
+**`m.andThen(f)`**  
 **`m.flatMap(f)`**
 
-Analogous to `Array.flatMap`; applies `f` to transform the the inner value of a
-`Some` or `Ok` according to the following rules:
+Analogous to `Array.flatMap`. These synonymous methods apply `f` to transform
+the the inner value of a `Some` or `Ok` according to the following rules:
 
 * `Some(x)` ↦ `f(x)`
 * `Ok()` ↦ `f(x)`
 * `None()` ↦ `None()`
 * `Err(e)` ↦ `Err(e)`
 
-**`m.mapNullable(f)`** (`Option` only)
+**`m.mapOr(def, f)`**  
+**`m.mapOrElse(lazyDef, f)`**  
+**`m.mapOrUndef(f)`**  
 
-Similar to `map`, except when `f` returns `undefined` or `null`.  Obeys the
-following rules:
+These methods are shorthands for `m.mapOr(f).unwrapOr(def)`,
+`m.mapOrElse(f).unwrapOr(lazyDef)`, and `m.mapOrUndef(f).unwrapOrUndef()`,
+respectively.
+
+**`m.mapNullable(f)`**  
+**`m.mapNullableOr(def, f)`**  
+**`m.mapNullableOrElse(lazyDef, f)`**  
+
+Similar to `map`, except when `f` returns `undefined` or `null`.  These methods
+obey the following rules:
 
 * `Some(x)` ↦ `Some(f(x))` if `f(x) != null`
 * `Some(x)` ↦ `None()` if `f(x) == null`
 * `None()` ↦ `None()`
+* `Ok(x)` ↦ `Ok(f(x))` if `f(x) != null`
+* `Ok(x)` ↦ `Err(def)` or `Err(lazyDef())` if `f(x) == null`
+* `Err(e)` ↦ `Err(e)`
 
+### Converting between exceptions, promises and `Result`
 
+**`Result.try(f)`**
 
-## Changes from Rust
+Returns `Ok(x)` if `f()` returns `x` or `Err(e)` if `f()` throws `e`.
 
-- All names use `camelCase` to follow JavaScript conventions.
-- Methods that panic in Rust throw errors.
-- Many type signatures are loosened to take advantage of TypeScript union types.
-- The constructors `Some`, `None`, `Ok`, and `Err` are top-level functions.
-- Each constructor has a corresponding type. The methods on the constructor
-  types have more precise signatures than those declared on `Option` and
-  `Result`.
-- Values of type `Some` and `Ok` allow direct access to their inner value via
-  their `value` field; values of type `Err` likewise have an `error` field.
-- Methods like `copied` and `cloned`, which are specific to Rust's type system,
-  have been omitted.
+**`m.unwrap()`**
 
-### Functions not in Rust
+Returns `x` if `m` is `Ok(x)`; throws `e` if `m` is `Err(e)`.
 
-- The top-level `Some`, `None`, `Ok`, and `Err` functions have corresponding
-  funtions with more precised signatured named `constSome`, `constNone`,
-  `constOk`, and `constErr`.
-- There are top-level type predicates, `isOption` and `isResult`.
-- The function `Option.fromNullable` function converts null and undefined values to `None()`;
-  the `Option.toNullable` method performs the roughly inverse operation and is a shorthand for
-  `o.unwrapOr(undefined)`.
-- The `Result.try` function converts exceptions to `Err` values; it is roughly
-  the inverse of `r.unwrap()`.
-- The `Result.fromPromise` function and `Result.toPromise` method allow easy
-  between representing an error as a rejected promise or promise resolved to as
-  `Err` value.
-- The `andThen` methods are aliased as `flatMap` for consistency with JavaScript
-  APIs.
+**`fromPromise(p)`** (alias: `Result.fromPromise`)
 
-### Changed Methods
+Given a promise `p` that resolves to `x` or rejects with `e`, returns a promise
+that resolves to `Ok(e)` or `Err(e)`.
 
-- The `expect` and `expectErr` methods can accept a function returning a string
-  in addition to a plain string.
-- The `unwrap` and `unwrapErr` methods can accept a optional nullary function to
-  create the error value to be thrown on failure.
-- `Err.unwrap` will throw its error value by default.
-- Instead of an `iter` method, `Option` and `Result` use the JavaScript iterable
-  protocol.
+**`m.toPromise()`**
 
+If `m` is `Ok(x)`, returns a promise that resolves to `x`; if `m` is `Err(e)`,
+returns a promise that rejects with `e`.
 
 
 ## Alternatives
@@ -267,7 +265,7 @@ following rules:
 
 ### Uninteresting Forks
 * [monads-io](https://www.npmjs.com/package/monads-io) - wrapper around sweet-monads
-- [@casperlabs/ts-results](https://www.npmjs.com/package/@casperlabs/ts-results)
-- [@wunderwerk/ts-results](https://www.npmjs.com/package/@wunderwerk/ts-results)
-- [@zondax/ts-results](https://www.npmjs.com/package/@zondax/ts-results)
-- [enhanced-ts-results](https://www.npmjs.com/package/enhanced-ts-results)
+* [@casperlabs/ts-results](https://www.npmjs.com/package/@casperlabs/ts-results)
+* [@wunderwerk/ts-results](https://www.npmjs.com/package/@wunderwerk/ts-results)
+* [@zondax/ts-results](https://www.npmjs.com/package/@zondax/ts-results)
+* [enhanced-ts-results](https://www.npmjs.com/package/enhanced-ts-results)

@@ -10,16 +10,11 @@ export function notCalled(...args: any[]): never {
   throw Error("Called notCalled");
 }
 
-export function expectArg<T, R>(expected: T, result: R): (actual: T) => R {
-  return (actual: T) => {
-    expect(actual).toBe(expected);
+export function expectArgs<R, A extends unknown[]>(result: R, ...expected: A): (...actual: A) => R {
+  return (...actual: A) => {
+    expect(actual).toEqual(expected);
     return result;
   };
 }
 
 export type SameType<T, U> = T extends U ? (U extends T ? T : never) : never;
-export type IsSameType<T, U> = T extends U
-  ? U extends T
-    ? true
-    : false
-  : false;

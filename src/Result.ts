@@ -60,6 +60,28 @@ export function isResult(arg: unknown): arg is Result<unknown, unknown> {
 }
 
 /**
+ * Returns `Ok(nullable)` unless `value` is null or undefined; otherwise returns
+ * `Err(error)`.
+ */
+export function fromNullableOr<T, E>(
+  error: E,
+  nullable: T,
+): Result<NonNullable<T>, E> {
+  return nullable == null ? Err(error) : Ok(nullable);
+}
+
+/**
+ * Returns `Ok(nullable)` unless `nullable` is null or undefined; otherwise
+ * returns `Err(f())`.
+ */
+export function fromNullableOrElse<T, E>(
+  f: () => E,
+  nullable: T,
+): Result<NonNullable<T>, E> {
+  return nullable == null ? Err(f()) : Ok(nullable);
+}
+
+/**
  * Converts a promise that resolves to `x` into a promise that resolves to
  * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
  * resolves to `Err(e)`.
@@ -119,6 +141,12 @@ export const Result = {
    * resolves to `Err(e)`.
    */
   fromPromise,
+
+  // @copy-comment
+  fromNullableOr,
+
+  // @copy-comment
+  fromNullableOrElse,
 
   /**
    * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
@@ -218,6 +246,20 @@ interface IResult<T, E> extends Iterable<T> {
   unwrapUnchecked(): T;
 
   /**
+   * If `this` is `Ok(x)`, returns `x`, otherwise returns `undefined`.
+   *
+   * Equivalent to `this.unwrapOr(undefined)`.
+   *
+   * @see {@link mapOrUndef}
+   */
+  unwrapOrUndef(): T | undefined;
+
+  /**
+   * Alias of {@link unwrapOrUndef}.
+   */
+  toNullable(): T | undefined;
+
+  /**
    * If `this` is `Err(e)`, returns `e`, otherwise throws an error. If
    * `ErrorFactory` is provided, it is called to generate the value to be
    * thrown.
@@ -257,32 +299,48 @@ interface IResult<T, E> extends Iterable<T> {
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): D | R;
 
   /**
+   * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
+   * `undefined`.
+   *
+   * Equivalent to `this.map(f).toNullable()`.
+   */
+  mapOrUndef<R>(f: (value: T) => R): R | undefined;
+
+  /**
+   * If `this` is `Ok(x)`, returns `fromNullableOr(f(x))`, otherwise returns
+   * `Err(error)`.
+   */
+  mapNullableOr<D, R>(defaultError: D, f: (value: T) => R | undefined | null): Result<NonNullable<R>, D | E>;
+
+  /**
+   * If `this` is `Ok(x)`, returns `fromNullableOrElse(d, f(x))`, otherwise returns
+   * `Err(error)`.
+  */
+  mapNullableOrElse<D, R>(d: () => D, f: (value: T) => R | undefined | null): Result<NonNullable<R>, D | E>;
+
+  /**
    * If `this` is `Err(e)`, returns `Err(f(e))`, otherwise returns
    * `this`.
    */
   mapErr<R>(f: (error: E) => R): Result<T, R>;
 
   /**
-   * If `this` is `Ok(x)`, returns `onOk(x)`, otherwise returns `onErr(e)` where
-   * `this` is `Err(e)`.
+   * Calls `f(x)` for its side effects if `this` is `Ok(x)`.
    *
-   * Compared to the other signatures of this method, this one has the least
-   * overhead, and it works best with TypeScript's inference rules.
+   * Equivalent to `this.mapOrElse(() => {}, f)`.
+   *
+   * @see {@link matchErr}, {@link mapOrElse}
    */
-  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
+  matchOk(f: (value: T) => void): void;
+
   /**
-   * If `this` is `Ok(x)`, calls `m.Ok(x)`.
+   * Calls `f(e)` for its side effects if `this` is `Err(e)`.
+   *
+   * Equivalent to `this.mapOrElse(f, () => {})`.
+   *
+   * @see {@link matchOk}, {@link mapOrElse}
    */
-  match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
-  /**
-   * If `this` is `Err(e)`, calls `m.Err(e)`.
-   */
-  match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
-  /**
-   * If `this` is `Ok(x)`, returns `m.Ok(x)`, otherwise returns `m.Err(e)` where
-   * `this` is `Err(e)`.
-   */
-  match<R>(m: Matcher<T, E, R>): R;
+  matchErr(f: (error: E) => void): void;
 
   /**
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
@@ -379,6 +437,14 @@ class OkImpl<T, E> implements IResult<T, E> {
     return this.value;
   }
 
+  unwrapOrUndef(): T {
+    return this.value;
+  }
+
+  toNullable(): T {
+    return this.value;
+  }
+
   unwrapUnchecked(): T {
     return this.value;
   }
@@ -407,29 +473,31 @@ class OkImpl<T, E> implements IResult<T, E> {
     return f(this.value);
   }
 
-  mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
+  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R {
     return f(this.value);
+  }
+
+  mapOrUndef<R>(f: (value: T) => R): R {
+    return f(this.value);
+  }
+
+  mapNullableOr<D, R>(defaultError: D, f: (value: T) => R | undefined | null): Result<NonNullable<R>, D|E> {
+    return fromNullableOr(defaultError, f(this.value));
+  }
+
+  mapNullableOrElse<D, R>(d: () => D, f: (value: T) => R | undefined | null): Result<NonNullable<R>, D | E> {
+    return fromNullableOrElse(d, f(this.value));
   }
 
   mapErr<R>(f: (error: E) => R): Result<T, R> {
     return this as unknown as Ok<T, R>;
   }
 
-  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
-  match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
-  match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
-  match<R>(m: Matcher<T, E, R>): R;
-  match<R>(
-    m: Partial<Matcher<T, E, R>> | ((value: T) => R),
-    onErr?: (error: E) => R,
-  ): void | R {
-    if (typeof m === "function") {
-      return m(this.value);
-    } else if (m.Ok) {
-      const r = m.Ok(this.value);
-      return m.Err ? r : undefined;
-    }
+  matchOk(f: (value: T) => void): void {
+    f(this.value);
   }
+
+  matchErr(f: (error: E) => void): void {}
 
   and<T2, E2>(other: Result<T2, E2>): Result<T2, E2> {
     return other;
@@ -452,9 +520,9 @@ class OkImpl<T, E> implements IResult<T, E> {
   }
 
   transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>> {
-    return this.unwrapUnchecked().match(
-      (value) => Some(Ok(value)),
+    return this.unwrapUnchecked().mapOrElse(
       () => None(),
+      (value) => Some(Ok(value)),
     );
   }
 
@@ -522,6 +590,14 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return undefined as T;
   }
 
+  unwrapOrUndef(): undefined {
+    return undefined;
+  }
+
+  toNullable(): undefined {
+    return undefined;
+  }
+
   unwrapErr(errorFactory?: () => unknown): E {
     return this.error;
   }
@@ -550,24 +626,26 @@ class ErrImpl<T, E> implements IResult<T, E> {
     return d(this.error);
   }
 
+  mapOrUndef<R>(f: (value: T) => R): undefined {
+    return undefined;
+  }
+
+  mapNullableOr<D, R>(defaultError: D, f: (value: T) => R | undefined | null): Err<NonNullable<R>, D | E> {
+    return this as Err<NonNullable<R>, D | E>;
+  }
+
+  mapNullableOrElse<D, R>(d: () => D, f: (value: T) => R | undefined | null): Err<NonNullable<R>, D | E> {
+    return this as Err<NonNullable<R>, D | E>;
+  }
+
   mapErr<R>(f: (error: E) => R): Err<T, R> {
     return new ErrImpl(f(this.error));
   }
 
-  match<R>(onOk: (value: T) => R, onErr: (error: E) => R): R;
-  match<R>(m: Pick<Matcher<T, E, R>, "Ok">): void;
-  match<R>(m: Pick<Matcher<T, E, R>, "Err">): void;
-  match<R>(m: Matcher<T, E, R>): R;
-  match<R>(
-    m: Partial<Matcher<T, E, R>> | ((value: T) => R),
-    onErr?: (error: E) => R,
-  ): void | R {
-    if (typeof m === "function") {
-      return onErr!(this.error);
-    } else if (m.Err) {
-      const r = m.Err(this.error);
-      return m.Ok ? r : undefined;
-    }
+  matchOk(f: (value: T) => void): void {}
+
+  matchErr(f: (error: E) => void): void {
+    f(this.error);
   }
 
   and<T2, E2>(other: Result<T2, E2>): Err<T, E> {
