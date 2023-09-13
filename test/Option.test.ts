@@ -9,6 +9,8 @@ import {
   constNone,
   constSome,
   isOption,
+  unwrapFields,
+  wrapFields,
 } from "../src/index";
 import {
   R,
@@ -32,6 +34,7 @@ describe("Option functions", () => {
     expect(Option.constSome).toBe(constSome);
     expect(Option.constNone).toBe(constNone);
     expect(Option.isOption).toBe(isOption);
+    expect(Option.unwrapFields).toBe(unwrapFields);
   });
 
   test("fromNullable", () => {
@@ -70,6 +73,29 @@ describe("Option functions", () => {
     expect(isOption(null)).toBe(false);
     expect(isOption(undefined)).toBe(false);
     expect(isOption(theT)).toBe(false);
+  });
+
+  test("wrapFields", () => {
+    type A = { a: string; b: number; c: boolean };
+    expect(
+      wrapFields({ a: "hello", b: 42 }) satisfies Option.WrapFields<Partial<A>>,
+    ).toEqual({ a: Some("hello"), b: Some(42) });
+    expect(
+      wrapFields(
+        { a: "hello", b: 42 },
+        { a: Some(""), c: None() },
+      ) satisfies Option.WrapFields<A>,
+    ).toEqual({ a: Some("hello"), b: Some(42), c: None() });
+  });
+
+  test("unwrapFields", () => {
+    type A = { a: string; b: number };
+    expect(
+      unwrapFields<A>({ a: Some("hello"), b: None() }) satisfies Partial<A>,
+    ).toEqual({ a: "hello" });
+    expect(
+      unwrapFields<A>({ a: None(), b: Some(42) }) satisfies Partial<A>,
+    ).toEqual({ b: 42 });
   });
 });
 
@@ -326,7 +352,7 @@ describe("Option methods", () => {
     );
   });
 
-  test("@iterator", () => {
+  test("@@iterator", () => {
     expect(Array.from(Some(theT))).toEqual([theT]);
     expect(Array.from(None())).toEqual([]);
   });

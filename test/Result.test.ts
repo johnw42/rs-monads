@@ -316,7 +316,7 @@ describe("Result methods", () => {
     expect(Err(42).toString()).toBe("Err(42)");
   });
 
-  test("@iterator", () => {
+  test("@@iterator", () => {
     expect(Array.from(Ok(theT))).toEqual([theT]);
     expect(Array.from(Err(theE))).toEqual([]);
   });

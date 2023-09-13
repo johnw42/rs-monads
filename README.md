@@ -141,6 +141,12 @@ the remaining function is called for its side-effect,and the method returns
 This method is the complement to `Option.fromNullable`.  It converts `Some(x)`
 to `x` and `None()` to undefined.
 
+**`[...before, ...m, ...after]`**
+
+The `Option` and `Result` types support the iterator protocol; `Some(x)` and
+`Ok(x)` yield one item, and `None()` and `Err(e)` yield no items.  This allowes
+optional values to be easily spliced into arrays.
+
 ### Testing Option an Result values
 
 **`isOption(m)`** (alias: `Option.isOption`)<br/>

@@ -52,17 +52,32 @@ export function isResult(arg: unknown): arg is Result<unknown, unknown> {
   return arg instanceof OkImpl || arg instanceof ErrImpl;
 }
 
+/**
+ * Converts a promise that resolves to `x` into a promise that resolves to
+ * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
+ * resolves to `Err(e)`.
+ */
+export function fromPromise<T>(
+  promise: Promise<T>,
+): Promise<Result<T, unknown>> {
+  return promise.then(
+    (value) => Ok(value),
+    (error) => Err(error),
+  );
+}
+
 export const Result = {
   Ok,
   Err,
   constOk,
   constErr,
   isResult,
+  fromPromise,
 
   /**
    * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
    *
-   * Its approximate inverse is {@link Option#unwrap}.
+   * Its approximate inverse is {@link Result#unwrap}.
    */
   try<T>(f: () => T): Result<T, unknown> {
     try {
@@ -70,18 +85,6 @@ export const Result = {
     } catch (error) {
       return Err(error);
     }
-  },
-
-  /**
-   * Converts a promise that resolves to `x` into a promise that resolves to
-   * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
-   * resolves to `Err(e)`.
-   */
-  fromPromise<T>(promise: Promise<T>): Promise<Result<T, unknown>> {
-    return promise.then(
-      (value) => Ok(value),
-      (error) => Err(error),
-    );
   },
 };
 

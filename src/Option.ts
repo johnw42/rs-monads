@@ -53,24 +53,86 @@ export function isOption(arg: unknown): arg is Option<unknown> {
   return arg instanceof SomeImpl || arg instanceof NoneImpl;
 }
 
-export const Option = {
+/**
+ * Given an object, returns a new object with the same keys whose corresponding
+ * values are wrapped with `Some`.
+ *
+ * For example, `{ a: 42, b: "xyzzy" }` ↦ `{ a: Some(42), b: Some("xyzzy") }`
+ */
+export function wrapFields<R extends object, P extends Partial<R> = Partial<R>>(
+  obj: Readonly<P>,
+): Option.WrapFields<P>;
+
+/**
+ * Given an object, returns a new object with the same keys whose corresponding
+ * values are wrapped with `Some`, merged with `defaults`, an object whose
+ * values are `Option` values.  If a field is present in both `obj` and
+ * `defaults`, the value from `obj` takes precedence.
+ *
+ * For example, when `obj` is `{ a: 42, b: "xyzzy" }` and `defaults` is `{ b:
+ * Some("default"), c: None() }`, the result is `{ a: Some(42), b: Some("xyzzy"), c:
+ * None() }`.
+ */
+export function wrapFields<
+  R extends object,
+  P extends Partial<R> = Partial<R>,
+  D extends Option.WrapFields<object> = Option.WrapFields<Partial<R>>,
+>(obj: Readonly<P>, defaults: Readonly<D>): Option.WrapFields<P> & D;
+
+export function wrapFields(obj: object, defaults?: object): object {
+  const partial = Object.fromEntries(
+    Object.entries(obj).map(([key, value]) => [key, Some(value)]),
+  );
+  return defaults ? { ...defaults, ...partial } : partial;
+}
+
+/**
+ * Given an object whose fields are `Option` values, returns an object with a
+ * subset of the original keys and whose values are the unwrapped contents of
+ * the fields with `Some` values.
+ *
+ * For example, `{ a: Some(42), b: None() }` becomes `{ a: 42 }`.
+ */
+export function unwrapFields<R extends object>(
+  obj: Option.WrapFields<R>,
+): Partial<R> {
+  return Object.fromEntries(
+    Object.entries(obj).flatMap(([key, option]) =>
+      Array.from((option as Option<unknown>).map((value) => [key, value])),
+    ),
+  ) as Partial<R>;
+}
+
+/**
+ * Returns `Some(value)` unless `value` is null or undefined; otherwise returns `None()`.
+ */
+export function fromNullable<T>(value: T): Option<NonNullable<T>> {
+  return value == null ? None<NonNullable<T>>() : Some(value);
+}
+
+const staticMethods = {
   Some,
   None,
   constSome,
   constNone,
   isOption,
-
-  /**
-   * Returns `Some(value)` if `value` is not null or undefined; otherwise returns `None()`.
-   */
-  fromNullable<T>(value: T): Option<NonNullable<T>> {
-    return value == null ? None<NonNullable<T>>() : Some(value);
-  },
+  fromNullable,
+  wrapFields,
+  unwrapFields,
 };
+
+export const Option: Readonly<typeof staticMethods> = staticMethods;
 
 export namespace Option {
   export type Some<T> = SomeImpl<T>;
   export type None<T> = NoneImpl<T>;
+
+  export type WrapFields<T extends object> = {
+    [K in keyof T]: Option<T[K]>;
+  };
+  export type UnwrapFields<R> = {
+    [K in keyof R]: R[K] extends Option<infer T> ? T : never;
+  };
 }
 
 interface Matcher<T, R> {
