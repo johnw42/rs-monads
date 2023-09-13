@@ -1,4 +1,3 @@
-import exp from "constants";
 import {
   Err,
   None,
@@ -34,6 +33,7 @@ describe("Option functions", () => {
     expect(Option.constSome).toBe(constSome);
     expect(Option.constNone).toBe(constNone);
     expect(Option.isOption).toBe(isOption);
+    expect(Option.wrapFields).toBe(wrapFields);
     expect(Option.unwrapFields).toBe(unwrapFields);
   });
 

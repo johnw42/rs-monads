@@ -45,7 +45,8 @@
     "build": "rollup -c rollup.config.js",
     "test": "jest",
     "lint": "eslint src/*.ts",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "copy-comments": "node copy-comments.js src/Option.ts src/Result.ts"
   },
   "sideEffects": false,
   "types": "lib",

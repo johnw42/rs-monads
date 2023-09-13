@@ -6,7 +6,14 @@ import { None, Option, Some, constNone, constSome } from "./Option";
  */
 export type Result<T, E> = Ok<T, E> | Err<T, E>;
 
+/**
+ * The subtype of `Result<T,E>` that contains a value of type `T`.
+ */
 export type Ok<T, E> = OkImpl<T, E>;
+
+/**
+ * The subtype of `Result<T,E>` that contains a value of type `E`.
+ */
 export type Err<T, E> = ErrImpl<T, E>;
 
 /**
@@ -67,11 +74,50 @@ export function fromPromise<T>(
 }
 
 export const Result = {
+  // @copy-comment
+  /**
+   * Returns an instance of `Ok` whose value is `value`.  The return value uses
+   * `Result` rather than `Ok` to avoid constraining the type of variables
+   * initialized by a call to this function.
+   *
+   * @see {@link constOk}
+   */
   Ok,
+
+  // @copy-comment
+  /**
+   * Returns an instance of `Err` whose value is `error`.  The return value uses
+   * `Result` rather than `Err` to avoid constraining the type of variables
+   * initialized by a call to this function.
+   *
+   * @see {@link constErr}
+   */
   Err,
+
+  // @copy-comment
+  /**
+   * Same as {@link Ok}, but returns a more specific type.
+   */
   constOk,
+
+  // @copy-comment
+  /**
+   * Same as {@link Err}, but returns a more specific type.
+   */
   constErr,
+
+  // @copy-comment
+  /**
+   * Tests wether an unknown value is an instance of `Result`.
+   */
   isResult,
+
+  // @copy-comment
+  /**
+   * Converts a promise that resolves to `x` into a promise that resolves to
+   * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
+   * resolves to `Err(e)`.
+   */
   fromPromise,
 
   /**
@@ -89,7 +135,16 @@ export const Result = {
 };
 
 export namespace Result {
+  // @copy-comment
+  /**
+   * The subtype of `Result<T,E>` that contains a value of type `T`.
+   */
   export type Ok<T, E> = OkImpl<T, E>;
+
+  // @copy-comment
+  /**
+   * The subtype of `Result<T,E>` that contains a value of type `E`.
+   */
   export type Err<T, E> = ErrImpl<T, E>;
 }
 

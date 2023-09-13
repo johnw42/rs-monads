@@ -5,7 +5,14 @@ import { Err, Ok, Result, constErr, constOk } from "./Result";
  */
 export type Option<T> = Some<T> | None<T>;
 
+/**
+ * The subtype of `Option<T>` that contains a value.
+ */
 export type Some<T> = SomeImpl<T>;
+
+/**
+ * The subtype of `Option<T>` that does not contain a value.
+ */
 export type None<T> = NoneImpl<T>;
 
 /**
@@ -110,21 +117,88 @@ export function fromNullable<T>(value: T): Option<NonNullable<T>> {
   return value == null ? None<NonNullable<T>>() : Some(value);
 }
 
-const staticMethods = {
+export const Option = {
+  // @copy-comment
+  /**
+   * Returns an instance of `Some` whose value is `value`.
+   *
+   * The return type uses `Option` rather than `Some` to avoid constraining the
+   * type of variables initialized by a call to this function.
+   *
+   * @see {@link constSome}
+   */
   Some,
+
+  // @copy-comment
+  /**
+   * Returns an instance of `None`.
+   *
+   * The return type uses `Option` rather than `None` to avoid constraining the
+   * type of variables initialized by a call to this function.
+   *
+   * @see {@link constNone}
+   */
   None,
+
+  // @copy-comment
+  /**
+   * Same as {@link Some}, but returns a more specific type.
+   */
   constSome,
+
+  // @copy-comment
+  /**
+   * Same as {@link None}, but returns a more specific type.
+   */
   constNone,
+
+  // @copy-comment
+  /**
+   * Tests wether an unknown value is an instance of `Option`.
+   */
   isOption,
+
+  // @copy-comment
+  /**
+   * Returns `Some(value)` unless `value` is null or undefined; otherwise returns `None()`.
+   */
   fromNullable,
+
+  // @copy-comment
+  /**
+   * Given an object, returns a new object with the same keys whose corresponding
+   * values are wrapped with `Some`, merged with `defaults`, an object whose
+   * values are `Option` values.  If a field is present in both `obj` and
+   * `defaults`, the value from `obj` takes precedence.
+   *
+   * For example, when `obj` is `{ a: 42, b: "xyzzy" }` and `defaults` is `{ b:
+   * Some("default"), c: None() }`, the result is `{ a: Some(42), b: Some("xyzzy"), c:
+   * None() }`.
+   */
   wrapFields,
+
+  // @copy-comment
+  /**
+   * Given an object whose fields are `Option` values, returns an object with a
+   * subset of the original keys and whose values are the unwrapped contents of
+   * the fields with `Some` values.
+   *
+   * For example, `{ a: Some(42), b: None() }` becomes `{ a: 42 }`.
+   */
   unwrapFields,
 };
 
-export const Option: Readonly<typeof staticMethods> = staticMethods;
-
 export namespace Option {
+  // @copy-comment
+  /**
+   * The subtype of `Option<T>` that contains a value.
+   */
   export type Some<T> = SomeImpl<T>;
+
+  // @copy-comment
+  /**
+   * The subtype of `Option<T>` that does not contain a value.
+   */
   export type None<T> = NoneImpl<T>;
 
   export type WrapFields<T extends object> = {
