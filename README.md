@@ -1,10 +1,11 @@
 # rs-monads
 
 This package contains types based heavily on Rust's main monad types: `Option`
-and `Result`.  Why use copy Rust APIs?  Aside from familiarity to Rust
-developers, I just like the way the Rust API is designed and I find the method
-names regular enough that it's easy to remember most of them based on a few
-patterns.
+and `Result`.  It also adds methods from the popular `tap` crate and a trivial
+monad called `Identity`.  Why use copy Rust APIs?  Aside from familiarity to
+Rust developers, I just like the way the Rust API is designed and I find the
+method names regular enough that it's easy to remember most of them based on a
+few patterns.
 
 
 
@@ -28,7 +29,8 @@ function convertBToC(b: B): C | null {...}
 function convertCToD(c: C): D | undefined {...}
 ```
 
-Chaining them together can get very ugly:
+Chaining them together can get very ugly, (althogh at least logging intermediate
+results is convenient):
 
 ```ts
 function pipeline1(a: A | undefined): D | undefined {
@@ -37,6 +39,7 @@ function pipeline1(a: A | undefined): D | undefined {
   }
   const b = convertAToB(a);
   const c = convertBToC(b);
+  console.log("After converting to C:", c);
   if (c === null) {
     return undefined;
   }
@@ -46,13 +49,15 @@ function pipeline1(a: A | undefined): D | undefined {
 ```
 
 But with the `Option` type, it looks a lot more like calling a series of methods
-with the `?.` operator:
+with the `?.` operator, and it's even still easy to do things like log
+intermediate results:
 
 ```ts
 function pipeline2(a: A | undefined): D | undefined {
   return fromNullable(a)
     .map(convertAToB)
     .mapNullable(convertBToC)
+    .tap(c => console.log("After converting to C:", c))
     .mapNullable(convertCToD)
     .toNullable()
 }
@@ -68,6 +73,7 @@ A type that may or may not contain a value of type `T`.  `Some<T>` contains a
 value and `None<T>` does not.  These subtypes are also aliased as
 `Option.Some<T>` and `Option.None<T>`.
 
+
 **`Result<T,E> = Ok<T,E> | Err<T,E>`**
 
 A type that value of type `T | E`  `Ok<T,E>` contains a
@@ -76,11 +82,17 @@ represents an error). These subtypes are also aliased as `Result.Ok<T,E>` and
 `Result.Err<T,E>`.
 
 
+**`Identity`**
+
+The trivial monad.  It is simply a box that holds a value.  Sometimes useful for
+sequencing function calls as if they were methods.
+
 
 ## Important Functions and Methods
 
-(This is not a comprehensive list; see the source code or the generates `.d.ts`
+(This is not a comprehensive list; see the source code or the generated `.d.ts`
 files for complete documentation.)
+
 
 ### Creating values
 
@@ -88,17 +100,26 @@ files for complete documentation.)
 
 Creates a `Some` value containing `x`.
 
+
 **`None()`** (alias: `Option.None`)
 
 Returns a `None` value not containing anything.
+
 
 **`Ok(x)`** (alias: `Result.Ok`)
 
 Creates an `Ok` value containing `x`.
 
+
 **`Err(e)`** (alias: `Result.Err`)
 
 Creates an `Err` value containing `e`.
+
+
+**`Identity(x)`**
+
+Creates an `Identity` value containing `x`.
+
 
 **`constSome(x)`** (alias: `Option.constSome`)  
 **`constNone(x)`** (alias: `Option.constNone`)  
@@ -108,6 +129,7 @@ Creates an `Err` value containing `e`.
 Alternate versions of the similarly-named functions above with a more precise
 return type suitable for intializing constants.
 
+
 **`fromNullable(x)`** (alias: `Option.fromNullable`)  
 **`fromNullableOr(def, x)`** (alias: `Result.fromNullableOr`)  
 **`fromNullableOrElse(lazyDef, x)`** (alias: `Result.fromNullableOrElse`)  
@@ -115,7 +137,8 @@ return type suitable for intializing constants.
 Wraps the value `x` as `Some(x)` or `Ok(x)` unless `x` is `null` or `undefined`,
 in which case it returns `None()`, `Err(der)` or `Err(lazyDef())`.
 
-### Extracting the contents of Option and Result values
+
+### Extracting the contents of monad values
 
 **`m.unwrap()`**  
 **`m.expect("m should have a value")`**
@@ -123,11 +146,13 @@ in which case it returns `None()`, `Err(der)` or `Err(lazyDef())`.
 If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise throws an error. If `m`
 is `Err(e)`, `unwrap` throws `e`.
 
+
 **`m.unwrapOr(def)`**  
 **`m.unwrapOrElse(lazyDef)`**
 
 If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise returns `def`  or
 `lazyDef()`.
+
 
 **`m.unwrapOrUndef()`**  
 **`m.toNullable()`**
@@ -135,34 +160,31 @@ If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise returns `def`  or
 These synonymous methods are the complement to `fromNullable`, `fromNullableOr`,
 and `fromNullableOrElse`. They are equivalent to `m.unwrapOr(undefined)`.
 
-**`m.matchSome(f)`**  
-**`m.matchNone(f)`**  
-**`m.matchOk(f)`**  
-**`m.matchErr(f)`**  
-
-These methods call their argument for its side effects if `m` is `Some`, `None`,
-`Ok`, or `Err`, respectively.
 
 **`[...before, ...m, ...after]`**
 
-The `Option` and `Result` types support the iterator protocol; `Some(x)` and
-`Ok(x)` yield one item, and `None()` and `Err(e)` yield no items.  This allowes
-optional values to be easily spliced into arrays.
+The monad types support the iterator protocol; `Some(x)` and `Ok(x)`, and
+`Identity` yield one item, and `None()` and `Err(e)` yield no items.  This
+allows optional values to be easily spliced into arrays.
 
+
+**Identity(x).value**  
 **Some(x).value**  
 **Ok(x).value**  
-**Err(e).error**
+**Err(e).error**  
 
-These fields hold `x` or `e`. Use `isSome`, `isOk`, or `isErr` to check that
-they exist.
+These fields hold `x` or `e`.  They are only defined on the relevant subclasses
+of `Option` and `Result`.
 
-### Testing Option an Result values
+
+### Testing monad values
 
 **`isOption(m)`** (alias: `Option.isOption`)  
 **`isResult(m)`** (alias: `Result.isResult`)
 
 Tests whether `m` is an instance of `Option` (i.e. `Some` or `None`) or `Result`
 (i.e. `Ok` or `Err`), respectively.
+
 
 **`m.isSome()`**  
 **`m.isNone()`**  
@@ -172,6 +194,7 @@ Tests whether `m` is an instance of `Option` (i.e. `Some` or `None`) or `Result`
 Tests whether `m` is an instance of `Some`, `None`, `Ok`, or `Err`,
 respectively.
 
+
 **`m.isSomeAnd(p)`**  
 **`m.isOkAnd(p)`**  
 **`m.isErrAnd(p)`**
@@ -179,28 +202,39 @@ respectively.
 Tests whether `m` is an instance of `Some`, `Ok`, or `Err`, respectively and its
 contained value satisfies the predicate `p`.
 
-### Transforming Option and Result values
+
+### Transforming monad values
 
 **`m.map(f)`**
 
 Analogous to `Array.map`; applies `f` to transform the the inner value of a
-`Some` or `Ok` according to the following rules:
+`Some`, `Ok`, or `Identity` according to the following rules:
 
 * `Some(x)` ↦ `Some(f(x)))`
 * `Ok()` ↦ `Ok(f(x())`
 * `None()` ↦ `None()`
 * `Err(e)` ↦ `Err(e)`
+- `Identity(x)` ↦ `Identity(f(x))`
+
 
 **`m.andThen(f)`**  
 **`m.flatMap(f)`**
 
 Analogous to `Array.flatMap`. These synonymous methods apply `f` to transform
-the the inner value of a `Some` or `Ok` according to the following rules:
+the the inner value of a `Some`, `Ok`, or `Identity` according to the following rules:
 
 * `Some(x)` ↦ `f(x)`
 * `Ok()` ↦ `f(x)`
 * `None()` ↦ `None()`
 * `Err(e)` ↦ `Err(e)`
+* `Identity(x)` ↦ `f(x)`
+
+
+**`m.pipe(f)`**
+
+Returns `f(m)` unconditionally.  This is similar to `tap`, but `f` is called for
+its return value rather than its side effects.
+
 
 **`m.mapOr(def, f)`**  
 **`m.mapOrElse(lazyDef, f)`**  
@@ -209,6 +243,7 @@ the the inner value of a `Some` or `Ok` according to the following rules:
 These methods are shorthands for `m.mapOr(f).unwrapOr(def)`,
 `m.mapOrElse(f).unwrapOr(lazyDef)`, and `m.mapOrUndef(f).unwrapOrUndef()`,
 respectively.
+
 
 **`m.mapNullable(f)`**  
 **`m.mapNullableOr(def, f)`**  
@@ -224,25 +259,56 @@ obey the following rules:
 * `Ok(x)` ↦ `Err(def)` or `Err(lazyDef())` if `f(x) == null`
 * `Err(e)` ↦ `Err(e)`
 
+
+### Side Effects
+
+**`m.tap(f)`**
+
+This method calls `f(m)`. A typical use of these functions is insert logging
+into a chain of calls:
+
+```ts
+return m
+  .map(tranformation)
+  .tap(m => console.log(m))
+  .map(anotherTranformation)
+```
+
+
+**`m.tapValue(f)`**  
+**`m.tapSome(f)`**  
+**`m.tapNone(f)`**  
+**`m.tapOk(f)`**  
+**`m.tapErr(f)`**
+
+These speciazed versions of `tap` call `f` for its side effects if `m` is
+`Identity`, `Some`, `None`, `Ok`, or `Err`, respectively, passing in any value
+they hold. They all return `m`.
+
+
 ### Converting between exceptions, promises and `Result`
 
 **`Result.try(f)`**
 
 Returns `Ok(x)` if `f()` returns `x` or `Err(e)` if `f()` throws `e`.
 
+
 **`m.unwrap()`**
 
 Returns `x` if `m` is `Ok(x)`; throws `e` if `m` is `Err(e)`.
+
 
 **`fromPromise(p)`** (alias: `Result.fromPromise`)
 
 Given a promise `p` that resolves to `x` or rejects with `e`, returns a promise
 that resolves to `Ok(e)` or `Err(e)`.
 
+
 **`m.toPromise()`**
 
 If `m` is `Ok(x)`, returns a promise that resolves to `x`; if `m` is `Err(e)`,
 returns a promise that rejects with `e`.
+
 
 
 ## Alternatives

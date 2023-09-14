@@ -7,44 +7,60 @@ import {
   Some,
   constNone,
   constSome,
+  extractSomes,
   fromNullable,
+  fromOptions,
+  isNone,
   isOption,
+  isSome,
   unwrapFields,
   wrapFields,
 } from "../src/index";
 import {
+  CallCounter,
   R,
   SameType,
   T,
   expectArgs,
+  expectType,
   notCalled,
   theE,
   theR,
   theT,
 } from "./utils";
 
+(expect as any).addEqualityTesters([
+  function (this: any, a: unknown, b: unknown) {
+    if (isOption(a) && isOption(b)) {
+      return a.equals(b, this.equals);
+    }
+    return undefined;
+  },
+]);
+
 describe("Option functions", () => {
   test("aliases", () => {
-    const ok: SameType<Option.Some<T>, Some<T>> = constSome(theT);
-    void ok;
-    const err: SameType<Option.None<T>, None<T>> = constNone();
-    void err;
+    expectType<SameType<Option.Some<T>, Some<T>>>(constSome(theT));
+    expectType<SameType<Option.None<T>, None<T>>>(constNone());
+
     expect(Option.Some).toBe(Some);
     expect(Option.None).toBe(None);
     expect(Option.constSome).toBe(constSome);
     expect(Option.constNone).toBe(constNone);
     expect(Option.fromNullable).toBe(fromNullable);
     expect(Option.isOption).toBe(isOption);
+    expect(Option.isSome).toBe(isSome);
+    expect(Option.isNone).toBe(isNone);
     expect(Option.wrapFields).toBe(wrapFields);
     expect(Option.unwrapFields).toBe(unwrapFields);
   });
 
   test("fromNullable", () => {
-    expect(Option.fromNullable(null).isNone()).toBe(true);
-    expect(Option.fromNullable(undefined).isNone()).toBe(true);
-    expect(Option.fromNullable(0).unwrap()).toBe(0);
-    expect(Option.fromNullable("").unwrap()).toBe("");
-    expect(Option.fromNullable(false).unwrap()).toBe(false);
+    expect(Option.fromNullable(null)).toEqual(None());
+    expect(Option.fromNullable(undefined)).toEqual(None());
+    expect(Option.fromNullable(0)).toEqual(Some(0));
+    expect(Option.fromNullable("")).toEqual(Some(""));
+    expect(Option.fromNullable(false)).toEqual(Some(false));
   });
 
   test("None", () => {
@@ -60,13 +76,11 @@ describe("Option functions", () => {
   });
 
   test("constNone", () => {
-    const x: None<number> = constNone();
-    expect(x.isSome()).toBe(false);
+    expectType<None<T>>(constNone()).toEqual(None());
   });
 
   test("constSome", () => {
-    const x: Some<number> = constSome(0);
-    expect(x.isSome()).toBe(true);
+    expectType<Some<T>>(constSome(theT)).toEqual(Some(theT));
   });
 
   test("isOption", () => {
@@ -75,6 +89,22 @@ describe("Option functions", () => {
     expect(isOption(null)).toBe(false);
     expect(isOption(undefined)).toBe(false);
     expect(isOption(theT)).toBe(false);
+  });
+
+  test("isSome", () => {
+    expect(isSome(Some(0))).toBe(true);
+    expect(isSome(None())).toBe(false);
+    expect(isSome(null)).toBe(false);
+    expect(isSome(undefined)).toBe(false);
+    expect(isSome(theT)).toBe(false);
+  });
+
+  test("isNone", () => {
+    expect(isNone(Some(0))).toBe(false);
+    expect(isNone(None())).toBe(true);
+    expect(isNone(null)).toBe(false);
+    expect(isNone(undefined)).toBe(false);
+    expect(isNone(theT)).toBe(false);
   });
 
   test("wrapFields", () => {
@@ -99,6 +129,25 @@ describe("Option functions", () => {
       unwrapFields<A>({ a: None(), b: Some(42) }) satisfies Partial<A>,
     ).toEqual({ b: 42 });
   });
+
+  test("fromOptions", () => {
+    function* iter(yieldNone: boolean) {
+      yield Some(1);
+      yield Some(2);
+      if (yieldNone) {
+        yield None();
+        throw Error("should not get here");
+      }
+    }
+    expect(fromOptions(iter(true))).toEqual(None());
+    expect(fromOptions(iter(false))).toEqual(Some([1, 2]));
+  });
+
+  test("extractSomes", () => {
+    expect(extractSomes([Some(1), None(), Some(2), None()])).toEqual([1, 2]);
+  });
+
+  test("Option.equals", () => {});
 });
 
 describe("Option methods", () => {
@@ -109,6 +158,10 @@ describe("Option methods", () => {
     // @ts-expect-error
     expect(None(theT).value).toBe(undefined);
   });
+
+  test("withType", () => {
+    expectType<None<R>>(constNone<T>().withType<R>());
+  })
 
   test("isSome", () => {
     expect(Some(0).isSome()).toBe(true);
@@ -124,6 +177,13 @@ describe("Option methods", () => {
   test("isNone", () => {
     expect(Some(theT).isNone()).toBe(false);
     expect(None().isNone()).toBe(true);
+  });
+
+  test("Option.equals", () => {
+    expect(Option.equals(theT, theT)).toBe(false);
+    expect(Option.equals(Some(theT), theT)).toBe(false);
+    expect(Option.equals(theT, Some(theT))).toBe(false);
+    testEqualsFn(Option.equals);
   });
 
   test("expect", () => {
@@ -175,16 +235,8 @@ describe("Option methods", () => {
 
   test("okOrElse", () => {
     expect(Some(theT).okOrElse(notCalled).unwrap()).toBe(theT);
-    expect(
-      None()
-        .okOrElse(expectArgs(theR))
-        .unwrapErr(),
-    ).toBe(theR);
-    expect(
-      None()
-        .okOrElse(expectArgs(theR))
-        .unwrapErr(),
-    ).toBe(theR);
+    expect(None().okOrElse(expectArgs(theR)).unwrapErr()).toBe(theR);
+    expect(None().okOrElse(expectArgs(theR)).unwrapErr()).toBe(theR);
   });
 
   test("map", () => {
@@ -222,20 +274,33 @@ describe("Option methods", () => {
     expect(None().mapNullable(notCalled).isNone()).toBe(true);
   });
 
-  test("matchSome", () => {
-    const mockFunc = jest.fn(expectArgs(theR, theT));
-    expect(Some(theT).matchSome(mockFunc)).toBe(undefined);
-    expect(mockFunc.mock.calls.length).toBe(1);
+  test("tap", () => {
+    const some = Some(theT);
+    const someFunc = jest.fn(expectArgs(undefined, some));
+    expect(some.tap(someFunc)).toBe(some);
+    expect(someFunc).toHaveBeenCalledTimes(1);
 
-    expect(None().matchSome(notCalled)).toBe(undefined);
+    const noneFunc = jest.fn(expectArgs(undefined, None()));
+    expect(None().tap(noneFunc)).toBe(None());
+    expect(noneFunc).toHaveBeenCalledTimes(1);
   });
 
-  test("matchNone", () => {
-    expect(Some(theT).matchNone(notCalled)).toBe(undefined);
+  test("tapSome", () => {
+    const mockFunc = jest.fn(expectArgs(theR, theT));
+    const some = Some(theT);
+    expect(some.tapSome(mockFunc)).toBe(some);
+    expect(mockFunc).toHaveBeenCalledTimes(1);
+
+    expect(None().tapSome(notCalled)).toBe(None());
+  });
+
+  test("tapNone", () => {
+    const some = Some(theT);
+    expect(some.tapNone(notCalled)).toBe(some);
 
     const mockFunc = jest.fn(expectArgs(theR));
-    expect(None().matchNone(mockFunc)).toBe(undefined);
-    expect(mockFunc.mock.calls.length).toBe(1);
+    expect(None().tapNone(mockFunc)).toBe(None());
+    expect(mockFunc).toHaveBeenCalledTimes(1);
   });
 
   test("and", () => {
@@ -245,27 +310,33 @@ describe("Option methods", () => {
     expect(None().and(None()).isNone()).toBe(true);
   });
 
-  test("andThen/flatMap", () => {
-    expect(
-      Some(theT)
-        .andThen(expectArgs(Some(theR), theT))
-        .unwrap(),
-    ).toBe(theR);
-    expect(Some(theT).andThen(expectArgs(None(), theT)).isNone()).toBe(true);
-    expect(
-      Some(theT)
-        .flatMap(expectArgs(Some(theR), theT))
-        .unwrap(),
-    ).toBe(theR);
-    expect(Some(theT).flatMap(expectArgs(None(), theT)).isNone()).toBe(true);
-    expect(None().andThen(notCalled).isNone()).toBe(true);
-    expect(None().flatMap(notCalled).isNone()).toBe(true);
+  test.each([
+    ["andThen", (x: Option<T>, f: (arg: T) => Option<R>) => x.andThen(f)],
+    ["flatMap", (x: Option<T>, f: (arg: T) => Option<R>) => x.flatMap(f)],
+  ])("%s", (_name, andThen) => {
+    expect(andThen(Some(theT), expectArgs(Some(theR), theT)).unwrap()).toBe(
+      theR,
+    );
+    expect(andThen(Some(theT), expectArgs(None(), theT)).isNone()).toBe(true);
+    expect(andThen(Some(theT), expectArgs(None(), theT)).isNone()).toBe(true);
+    expect(andThen(None(), notCalled).isNone()).toBe(true);
+
+    expectType<Option<T>>(constSome(theT).andThen(() => Some(theT)));
+    expectType<Some<T>>(constSome(theT).andThen(() => constSome(theT)));
+    expectType<None<T>>(constSome(theT).andThen(() => constNone<T>()));
+    expectType<None<T>>(constNone().andThen(() => constSome(theT)));
+
+    expectType<Some<T>>(constSome(theT).flatMap(() => constSome(theT)));
+    expectType<None<T>>(constSome(theT).flatMap(() => constNone<T>()));
+    expectType<None<T>>(constNone().flatMap(() => constSome(theT)));
   });
 
   test("filter", () => {
     expect(Some(theT).filter(expectArgs(true, theT)).unwrap()).toBe(theT);
     expect(Some(theT).filter(expectArgs(false, theT)).isNone()).toBe(true);
     expect(None().filter(notCalled).isNone()).toBe(true);
+
+    expectType<None<T>>(constNone<T>().filter(notCalled));
   });
 
   test("or", () => {
@@ -293,26 +364,29 @@ describe("Option methods", () => {
   });
 
   test("zip", () => {
-    expect(Some(theT).zip(Some(theE)).unwrap()).toEqual([theT, theE]);
-    expect(Some(theT).zip(None()).isNone()).toBe(true);
-    expect(None().zip(Some(theE)).isNone()).toBe(true);
-    expect(None().zip(None()).isNone()).toBe(true);
+    expect(Some(theT).zip(Some(theE))).toEqual(Some([theT, theE]));
+    expect(Some(theT).zip(None())).toEqual(None());
+    expect(None().zip(Some(theE))).toEqual(None());
+    expect(None().zip(None())).toEqual(None());
   });
 
   test("zipWith", () => {
     expect(
       Some(theT)
-        .zipWith(Some(theR), expectArgs(theR, theT, theR))
+        .zipWith(Some(theE), expectArgs(theR, theT, theE))
         .unwrap(),
     ).toBe(theR);
-    expect(Some(theT).zipWith(None(), notCalled).isNone()).toBe(true);
-    expect(None().zipWith(Some(theR), notCalled).isNone()).toBe(true);
+    expect(Some(theT).zipWith(None(), notCalled)).toEqual(None());
+    expect(None().zipWith(Some(theR), notCalled)).toEqual(None());
   });
 
-  test("flatten", () => {
-    expect(Some(Some(theT)).flatten().unwrap()).toBe(theT);
-    expect(Some(None()).flatten().isNone()).toBe(true);
-    expect(None<Option<unknown>>().flatten().isNone()).toBe(true);
+  test.each([
+    ["flatten", (x: Option<Option<T>>) => x.flatten()],
+    ["join", (x: Option<Option<T>>) => x.join()],
+  ])("%s", (_name, flatten) => {
+    expect(flatten(Some(Some(theT))).unwrap()).toBe(theT);
+    expect(flatten(Some(None())).isNone()).toBe(true);
+    expect(flatten(None<Option<T>>()).isNone()).toBe(true);
   });
 
   test("transpose", () => {
@@ -321,6 +395,10 @@ describe("Option methods", () => {
     expect(None<Result<unknown, unknown>>().transpose().unwrap().isNone()).toBe(
       true,
     );
+  });
+
+  test("equals", () => {
+    testEqualsFn((a, b, cmp) => a.equals(b, cmp));
   });
 
   test("@@iterator", () => {
@@ -333,3 +411,44 @@ describe("Option methods", () => {
     expect(None().toString()).toBe("None()");
   });
 });
+
+function testEqualsFn(
+  eq: (
+    a: Option<unknown>,
+    b: Option<unknown>,
+    cmp?: (aValue: unknown, bValue: unknown) => boolean,
+  ) => boolean,
+): void {
+  expect(eq(Some(theT), Some(theT))).toBe(true);
+  expect(eq(Some(theT), Some(theE))).toBe(false);
+  expect(eq(Some(theT), None())).toBe(false);
+  expect(eq(None(), Some(theT))).toBe(false);
+  expect(eq(None(), None())).toBe(true);
+
+  expect(eq(Some(Some(theT)), Some(Some(theT)))).toBe(true);
+  expect(eq(Some(Some(theT)), Some(Some(theE)))).toBe(false);
+  expect(eq(Some(Some(theT)), Some(None()))).toBe(false);
+  expect(eq(None(), Some(None()))).toBe(false);
+  expect(eq(None(), None())).toBe(true);
+
+  for (const innerEqual of [true, false]) {
+    for (const [left, right] of [
+      [theT, theT],
+      [theT, theE],
+      [Some(theT), Some(theT)],
+      [Some(theT), Some(theE)],
+    ]) {
+      const counter = new CallCounter();
+      expect(
+        eq(
+          Some(left),
+          Some(right),
+          counter.expectArgs(innerEqual, left, right),
+        ),
+      ).toBe(innerEqual);
+      expect(counter.count).toBe(1);
+    }
+  }
+  expect(eq(Some(theT), None(), notCalled)).toBe(false);
+  expect(eq(None(), Some(theT), notCalled)).toBe(false);
+}
