@@ -164,6 +164,21 @@ export const Result = {
    */
   constOk,
 
+  /**
+   * Tests whether `a` and `b` are `Result` values which are equal according to
+   * `a.equals(b, okCmp, errCmp)`.
+   *
+   * @see {@link ResultImpl#equals}
+   */
+  equals(
+    a: unknown,
+    b: unknown,
+    okCmp?: (aValue: unknown, bValue: unknown) => boolean,
+    errCmp?: (aError: unknown, bError: unknown) => boolean,
+  ): boolean {
+    return isResult(a) && isResult(b) && a.equals(b, okCmp, errCmp);
+  },
+  
   // @copy-comment
   /**
    * Converts a promise that resolves to `x` into a promise that resolves to
@@ -192,21 +207,6 @@ export const Result = {
    * Tests wether an unknown value is an instance of `Result`.
    */
   isResult,
-
-  /**
-   * Tests whether `a` and `b` are `Result` values which are equal according to
-   * `a.equals(b, okCmp, errCmp)`.
-   *
-   * @see {@link ResultImpl#equals}
-   */
-  equals(
-    a: unknown,
-    b: unknown,
-    okCmp?: (aValue: unknown, bValue: unknown) => boolean,
-    errCmp?: (aError: unknown, bError: unknown) => boolean,
-  ): boolean {
-    return isResult(a) && isResult(b) && a.equals(b, okCmp, errCmp);
-  },
 
   /**
    * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
