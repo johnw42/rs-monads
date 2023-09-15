@@ -55,51 +55,30 @@ export function constSome<T>(value: T): Some<T> {
 }
 
 /**
- * Collects `x` for every `Some(x)` in `options` into a new array which is then
- * returned.
+ * Returns `None()` if `nullable` is null or undefined, otherwise returns
+ * `Some(x)`.
  */
-export function extractSomes<T>(options: Iterable<Option<T>>): T[] {
-  const items: T[] = [];
-  for (const option of options) {
-    if (option.isSome()) {
-      items.push(option.value);
-    }
-  }
-  return items;
-}
-
-/**
- * Returns `Some(nullable)` unless `nullable` is null or undefined; otherwise returns `None()`.
- */
-export function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
+function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
   return nullable == null ? None() : Some(nullable);
 }
 
 /**
- * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
- * Stops at the first `None()` and returns `None()`, otherwise returns
- * `Some(a)`.
- *
- * This operation is useful in scenarios where `None()` represents failure.
- *
- * @see {@link Result.fromResults}
+ * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
  */
-export function fromOptions<T>(options: Iterable<Option<T>>): Option<T[]> {
-  const items: T[] = [];
-  for (const option of options) {
-    if (option.isSome()) {
-      items.push(option.value);
-    } else {
-      return option.withType<T>();
-    }
-  }
-  return Some(items);
+function fromTruthy<T>(value: T): Option<NonNullable<T>> {
+  return value ? Some(value) : None();
 }
 
+/**
+ * Tests whether `arg` is an instance of `Some`.
+ */
 export function isSome(arg: unknown): arg is Some<unknown> {
   return arg instanceof SomeImpl;
 }
 
+/**
+ * Tests whether `arg` is an instance of `None`.
+ */
 export function isNone(arg: unknown): arg is None<unknown> {
   return arg instanceof NoneImpl;
 }
@@ -112,66 +91,73 @@ export function isOption(arg: unknown): arg is Option<unknown> {
 }
 
 /**
- * Given an object whose fields are `Option` values, returns an object with a
- * subset of the original keys and whose values are the unwrapped contents of
- * the fields with `Some` values.
+ * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
+ * Stops at the first `None()` and returns `None()`, otherwise returns
+ * `Some(a)`.
  *
- * For example, `{ a: Some(42), b: None() }` becomes `{ a: 42 }`.
+ * This operation is useful in scenarios where `None()` represents failure.
+ *
+ * @see {@link Result.fromArray}
  */
-export function unwrapFields<R extends object>(
-  obj: Option.WrapFields<R>,
-): Partial<R> {
-  return Object.fromEntries(
-    Object.entries(obj).flatMap(([key, option]) =>
-      Array.from((option as Option<unknown>).map((value) => [key, value])),
-    ),
-  ) as any;
+export function takeUnlessNone<T>(options: Iterable<Option<T>>): Option<T[]> {
+  const items: T[] = [];
+  for (const option of options) {
+    if (option.isSome()) {
+      items.push(option.value);
+    } else {
+      return option.withType<T>();
+    }
+  }
+  return Some(items);
 }
 
 /**
- * Given an object, returns a new object with the same keys whose corresponding
- * values are wrapped with `Some`.
- *
- * For example, `{ a: 42, b: "xyzzy" }` ↦ `{ a: Some(42), b: Some("xyzzy") }`
+ * Collects `x` for every `Some(x)` in `options` into a new array which is then
+ * returned.
  */
-export function wrapFields<R extends object, P extends Partial<R> = Partial<R>>(
-  obj: Readonly<P>,
-): Option.WrapFields<P>;
-
-/**
- * Given an object, returns a new object with the same keys whose corresponding
- * values are wrapped with `Some`, merged with `defaults`, an object whose
- * values are `Option` values.  If a field is present in both `obj` and
- * `defaults`, the value from `obj` takes precedence.
- *
- * For example, when `obj` is `{ a: 42, b: "xyzzy" }` and `defaults` is `{ b:
- * Some("default"), c: None() }`, the result is `{ a: Some(42), b: Some("xyzzy"), c:
- * None() }`.
- */
-export function wrapFields<
-  R extends object,
-  P extends Partial<R> = Partial<R>,
-  D extends Option.WrapFields<object> = Option.WrapFields<Partial<R>>,
->(obj: Readonly<P>, defaults: Readonly<D>): Option.WrapFields<P> & D;
-
-export function wrapFields(obj: object, defaults?: object): object {
-  const partial = Object.fromEntries(
-    Object.entries(obj).map(([key, value]) => [key, Some(value)]),
-  );
-  return defaults ? { ...defaults, ...partial } : partial;
+export function unwrapSomes<T>(options: Iterable<Option<T>>): T[] {
+  const items: T[] = [];
+  for (const option of options) {
+    if (option.isSome()) {
+      items.push(option.value);
+    }
+  }
+  return items;
 }
 
 export const Option = {
   // @copy-comment
+  /**
+   * Returns an instance of `Some` whose value is `value`.
+   *
+   * The return type uses `Option` rather than `Some` to avoid constraining the
+   * type of variables initialized by a call to this function.
+   *
+   * @see {@link constSome}
+   */
   Some,
 
   // @copy-comment
+  /**
+   * Returns an instance of `None`.
+   *
+   * The return type uses `Option` rather than `None` to avoid constraining the
+   * type of variables initialized by a call to this function.
+   *
+   * @see {@link constNone}
+   */
   None,
 
   // @copy-comment
+  /**
+   * Same as {@link Some}, but returns a more specific type.
+   */
   constSome,
 
   // @copy-comment
+  /**
+   * Same as {@link None}, but returns a more specific type.
+   */
   constNone,
 
   /**
@@ -189,39 +175,58 @@ export const Option = {
   },
 
   // @copy-comment
+  /**
+   * Returns `None()` if `nullable` is null or undefined, otherwise returns
+   * `Some(x)`.
+   */
   fromNullable,
 
   // @copy-comment
+  fromTruthy,
+
+  // @copy-comment
+  /**
+   * Tests whether `arg` is an instance of `None`.
+   */
   isNone,
 
   // @copy-comment
+  /**
+   * Tests wether an unknown value is an instance of `Option`.
+   */
   isOption,
 
   // @copy-comment
+  /**
+   * Tests whether `arg` is an instance of `Some`.
+   */
   isSome,
 
   // @copy-comment
   /**
-   * Given an object whose fields are `Option` values, returns an object with a
-   * subset of the original keys and whose values are the unwrapped contents of
-   * the fields with `Some` values.
+   * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
+   * Stops at the first `None()` and returns `None()`, otherwise returns
+   * `Some(a)`.
    *
-   * For example, `{ a: Some(42), b: None() }` becomes `{ a: 42 }`.
+   * This operation is useful in scenarios where `None()` represents failure.
+   *
+   * @see {@link Result.fromArray}
    */
-  unwrapFields,
+  takeUnlessNone,
 
   // @copy-comment
   /**
-   * Given an object, returns a new object with the same keys whose corresponding
-   * values are wrapped with `Some`, merged with `defaults`, an object whose
-   * values are `Option` values.  If a field is present in both `obj` and
-   * `defaults`, the value from `obj` takes precedence.
-   *
-   * For example, when `obj` is `{ a: 42, b: "xyzzy" }` and `defaults` is `{ b:
-   * Some("default"), c: None() }`, the result is `{ a: Some(42), b: Some("xyzzy"), c:
-   * None() }`.
+   * Collects `x` for every `Some(x)` in `options` into a new array which is then
+   * returned.
    */
-  wrapFields,
+  unwrapSomes,
+
+  // @copy-comment
+  /**
+   * Collects `x` for every `Some(x)` in `options` into a new array which is then
+   * returned.
+   */
+  unwrapValues: unwrapSomes,
 };
 
 export namespace Option {
@@ -236,13 +241,6 @@ export namespace Option {
    * The subtype of `Option<T>` that contains a value.
    */
   export type Some<T> = SomeImpl<T>;
-
-  export type WrapFields<T extends object> = {
-    [K in keyof T]: Option<T[K]>;
-  };
-  export type UnwrapFields<R> = {
-    [K in keyof R]: R[K] extends Option<infer T> ? T : never;
-  };
 }
 
 /**

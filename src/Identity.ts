@@ -33,14 +33,55 @@ Identity.equals = (
 };
 
 /**
- * Tests whether `arg` is an `Identity` object.
+ * Tests whether `arg` is an `Identity` object
  */
 export function isIdentity(arg: unknown): arg is Identity<unknown> {
   return arg instanceof IdentityImpl;
 }
 
 // @copy-comment
+/**
+ * Tests whether `arg` is an `Identity` object
+ */
 Identity.isIdentity = isIdentity;
+
+/**
+ * Collects `x` for every `Identity(x)` into an array `a`. and returns
+ * `Identity(a)`.
+ */
+export function takeIdentities<T>(identities: Iterable<Identity<T>>): Identity<T[]> {
+  return Identity(unwrapIdentities(identities));
+}
+
+// @copy-comment
+/**
+ * Collects `x` for every `Identity(x)` into an array `a`. and returns
+ * `Identity(a)`.
+ */
+Identity.takeIdentities = takeIdentities;
+
+/**
+ * Collects `x` for every `Identity(x)` into an array `a`. and returns `a`.
+ */
+export function unwrapIdentities<T>(identities: Iterable<Identity<T>>): T[] {
+  const items: T[] = [];
+  for (const identity of identities) {
+    items.push(identity.value);
+  }
+  return items;
+}
+
+// @copy-comment
+/**
+ * Collects `x` for every `Identity(x)` into an array `a`. and returns `a`.
+ */
+Identity.unwrapIdentities = unwrapIdentities;
+
+// @copy-comment
+/**
+ * Collects `x` for every `Identity(x)` into an array `a`. and returns `a`.
+ */
+Identity.unwrapValues = unwrapIdentities;
 
 export class IdentityImpl<T> extends Tappable implements Iterable<T> {
   constructor(

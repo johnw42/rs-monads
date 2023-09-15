@@ -47,7 +47,7 @@
     "test": "jest",
     "lint": "eslint src/*.ts",
     "prepare": "husky install",
-    "copy-comments": "node copy-comments.js src/Option.ts src/Result.ts"
+    "copy-comments": "node copy-comments.js src/Option.ts src/Result.ts src/Identity.ts"
   },
   "sideEffects": false,
   "types": "lib",

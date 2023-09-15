@@ -7,14 +7,11 @@ import {
   Some,
   constNone,
   constSome,
-  extractSomes,
-  fromNullable,
-  fromOptions,
   isNone,
   isOption,
   isSome,
-  unwrapFields,
-  wrapFields,
+  takeUnlessNone,
+  unwrapSomes,
 } from "../src/index";
 import {
   CallCounter,
@@ -47,12 +44,12 @@ describe("Option functions", () => {
     expect(Option.None).toBe(None);
     expect(Option.constSome).toBe(constSome);
     expect(Option.constNone).toBe(constNone);
-    expect(Option.fromNullable).toBe(fromNullable);
     expect(Option.isOption).toBe(isOption);
     expect(Option.isSome).toBe(isSome);
     expect(Option.isNone).toBe(isNone);
-    expect(Option.wrapFields).toBe(wrapFields);
-    expect(Option.unwrapFields).toBe(unwrapFields);
+    expect(Option.takeUnlessNone).toBe(takeUnlessNone);
+    expect(Option.unwrapSomes).toBe(unwrapSomes);
+    expect(Option.unwrapValues).toBe(unwrapSomes);
   });
 
   test("None", () => {
@@ -75,15 +72,11 @@ describe("Option functions", () => {
     expectType<Some<T>>(constSome(theT)).toEqual(Some(theT));
   });
 
-  test("Option.equals", () => {
+  test("equals", () => {
     expect(Option.equals(theT, theT)).toBe(false);
     expect(Option.equals(Some(theT), theT)).toBe(false);
     expect(Option.equals(theT, Some(theT))).toBe(false);
     testEqualsFn(Option.equals);
-  });
-
-  test("extractSomes", () => {
-    expect(extractSomes([Some(1), None(), Some(2), None()])).toEqual([1, 2]);
   });
 
   test("fromNullable", () => {
@@ -94,17 +87,13 @@ describe("Option functions", () => {
     expect(Option.fromNullable(false)).toEqual(Some(false));
   });
 
-  test("fromOptions", () => {
-    function* iter(yieldNone: boolean) {
-      yield Some(1);
-      yield Some(2);
-      if (yieldNone) {
-        yield None();
-        throw Error("should not get here");
-      }
-    }
-    expect(fromOptions(iter(true))).toEqual(None());
-    expect(fromOptions(iter(false))).toEqual(Some([1, 2]));
+  test("fromTruthy", () => {
+    expect(Option.fromTruthy(true)).toEqual(Some(true));
+    expect(Option.fromTruthy(null)).toEqual(None());
+    expect(Option.fromTruthy(undefined)).toEqual(None());
+    expect(Option.fromTruthy(0)).toEqual(None());
+    expect(Option.fromTruthy("")).toEqual(None());
+    expect(Option.fromTruthy(false)).toEqual(None());
   });
 
   test("isOption", () => {
@@ -131,27 +120,21 @@ describe("Option functions", () => {
     expect(isNone(theT)).toBe(false);
   });
 
-  test("unwrapFields", () => {
-    type A = { a: string; b: number };
-    expect(
-      unwrapFields<A>({ a: Some("hello"), b: None() }) satisfies Partial<A>,
-    ).toEqual({ a: "hello" });
-    expect(
-      unwrapFields<A>({ a: None(), b: Some(42) }) satisfies Partial<A>,
-    ).toEqual({ b: 42 });
+  test("takeUnlessNone", () => {
+    function* iter(yieldNone: boolean) {
+      yield Some(1);
+      yield Some(2);
+      if (yieldNone) {
+        yield None();
+        throw Error("should not get here");
+      }
+    }
+    expect(takeUnlessNone(iter(true))).toEqual(None());
+    expect(takeUnlessNone(iter(false))).toEqual(Some([1, 2]));
   });
 
-  test("wrapFields", () => {
-    type A = { a: string; b: number; c: boolean };
-    expect(
-      wrapFields({ a: "hello", b: 42 }) satisfies Option.WrapFields<Partial<A>>,
-    ).toEqual({ a: Some("hello"), b: Some(42) });
-    expect(
-      wrapFields(
-        { a: "hello", b: 42 },
-        { a: Some(""), c: None() },
-      ) satisfies Option.WrapFields<A>,
-    ).toEqual({ a: Some("hello"), b: Some(42), c: None() });
+  test("unwrapSomes", () => {
+    expect(unwrapSomes([Some(1), None(), Some(2), None()])).toEqual([1, 2]);
   });
 });
 

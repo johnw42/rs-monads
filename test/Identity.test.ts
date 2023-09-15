@@ -1,4 +1,4 @@
-import { Identity, isIdentity } from "../src/index";
+import { Identity, isIdentity, takeIdentities, unwrapIdentities } from "../src/index";
 import {
   CallCounter,
   R,
@@ -23,6 +23,9 @@ describe("Identity functions", () => {
   test("aliases", () => {
     expect(Identity).toBe(Identity);
     expect(Identity.isIdentity).toBe(isIdentity);
+    expect(Identity.takeIdentities).toBe(takeIdentities);
+    expect(Identity.unwrapIdentities).toBe(unwrapIdentities);
+    expect(Identity.unwrapValues).toBe(unwrapIdentities);
   });
 
   test("Identity.equals", () => {
@@ -37,6 +40,20 @@ describe("Identity functions", () => {
     expect(isIdentity(null)).toBe(false);
     expect(isIdentity(undefined)).toBe(false);
     expect(isIdentity(theT)).toBe(false);
+  });
+
+  test("takeIdentities", () => {
+    const data = [1, 2, 3];
+    const wrapped = data.map(Identity);
+    expect(takeIdentities(wrapped)).toEqual(Identity(data));
+  });
+
+
+  test("unwrapIdentities", () => {
+    const data = [1, 2, 3];
+    const wrapped = data.map(Identity);
+    expect(unwrapIdentities(wrapped)).toEqual(data);
+    expect(unwrapIdentities(wrapped)).toEqual(Array.from(wrapped).flatMap(m => Array.from(m)));
   });
 });
 

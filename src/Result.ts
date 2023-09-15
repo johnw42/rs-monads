@@ -54,6 +54,21 @@ export function constOk<T, E>(value: T): Ok<T, E> {
 }
 
 /**
+ * Tests whether `a` and `b` are `Result` values which are equal according to
+ * `a.equals(b, okCmp, errCmp)`.
+ *
+ * @see {@link ResultImpl#equals}
+ */
+function equals(
+  a: unknown,
+  b: unknown,
+  okCmp?: (aValue: unknown, bValue: unknown) => boolean,
+  errCmp?: (aError: unknown, bError: unknown) => boolean,
+): boolean {
+  return isResult(a) && isResult(b) && a.equals(b, okCmp, errCmp);
+}
+
+/**
  * Returns `Ok(nullable)` unless `value` is null or undefined; otherwise returns
  * `Err(error)`.
  */
@@ -90,24 +105,23 @@ export function fromPromise<T>(
 }
 
 /**
- * Collects a sequence of results into a single result containing the `Ok`
- * values. If any of the inputs is `Err(e)`, stopes immediately and returns
- * `Err(e)`.
- *
- * Compare to the `collect()` method in Rust.
+ * Returns `Ok(value)` if `Boolean(value)`, otherwise returns `Err(error)`.
  */
-export function fromResults<T, E>(
-  results: Iterable<Result<T, E>>,
-): Result<T[], E> {
-  const items: T[] = [];
-  for (const result of results) {
-    if (result.isOk()) {
-      items.push(result.value);
-    } else {
-      return result.withType<T[]>();
-    }
-  }
-  return Ok(items);
+function fromTruthyOr<T, E>(
+  error: E,
+  value: T,
+): Result<NonNullable<T>, E> {
+  return value ? Ok(value) : Err(error);
+}
+
+/**
+ * Returns `Ok(value)` if `Boolean(value)`, otherwise returns `Err(f())`.
+ */
+function fromTruthyOrElse<T, E>(
+  f: () => E,
+  value: T,
+): Result<NonNullable<T>, E> {
+  return value ? Ok(value) : Err(f());
 }
 
 /**
@@ -129,6 +143,83 @@ export function isOk(arg: unknown): arg is Result<unknown, unknown> {
  */
 export function isResult(arg: unknown): arg is Result<unknown, unknown> {
   return arg instanceof ResultBase;
+}
+
+/**
+ * Collects a sequence of results into a single result containing the `Ok`
+ * values. If any of the inputs is `Err(e)`, stopes immediately and returns
+ * `Err(e)`.
+ */
+export function takeUnlessErr<T, E>(
+  results: Iterable<Result<T, E>>,
+): Result<T[], E> {
+  const items: T[] = [];
+  for (const result of results) {
+    if (result.isOk()) {
+      items.push(result.value);
+    } else {
+      return result.withType<T[]>();
+    }
+  }
+  return Ok(items);
+}
+
+/**
+ * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
+ *
+ * Its inverse is {@link Result#unwrap}.
+ */
+function tryFrom<T>(f: () => T): Result<T, unknown> {
+  try {
+    return Ok(f());
+  } catch (error) {
+    return Err(error);
+  }
+}
+
+/**
+ * Collects `e` for every `Err(e)` in `results` into a new array which is then
+ * returned.
+ */
+export function unwrapErrs<T, E>(results: Iterable<Result<T, E>>): E[] {
+  const errors: E[] = [];
+  for (const result of results) {
+    if (result.isErr()) {
+      errors.push(result.error);
+    }
+  }
+  return errors;
+}
+
+/**
+ * Collects `x` for every `Ok(x)` in `results` into a one array and `e` from
+ * every `Err(e)` into another, and returns both arrays.
+ */
+export function unwrapResults<T, E>(results: Iterable<Result<T, E>>): [T[], E[]] {
+  const values: T[] = [];
+  const errors: E[] = [];
+  for (const result of results) {
+    if (result.isOk()) {
+      values.push(result.value);
+    } else {
+      errors.push(result.error);
+    }
+  }
+  return [values, errors];
+}
+
+/**
+ * Collects `x` for every `Ok(x)` in `results` into a new array which is then
+ * returned.
+ */
+export function unwrapOks<T, E>(results: Iterable<Result<T, E>>): T[] {
+  const values: T[] = [];
+  for (const result of results) {
+    if (result.isOk()) {
+      values.push(result.value);
+    }
+  }
+  return values;
 }
 
 export const Result = {
@@ -164,21 +255,15 @@ export const Result = {
    */
   constOk,
 
+  // @copy-comment
   /**
    * Tests whether `a` and `b` are `Result` values which are equal according to
    * `a.equals(b, okCmp, errCmp)`.
    *
    * @see {@link ResultImpl#equals}
    */
-  equals(
-    a: unknown,
-    b: unknown,
-    okCmp?: (aValue: unknown, bValue: unknown) => boolean,
-    errCmp?: (aError: unknown, bError: unknown) => boolean,
-  ): boolean {
-    return isResult(a) && isResult(b) && a.equals(b, okCmp, errCmp);
-  },
-  
+  equals,
+
   // @copy-comment
   /**
    * Converts a promise that resolves to `x` into a promise that resolves to
@@ -188,18 +273,43 @@ export const Result = {
   fromPromise,
 
   // @copy-comment
+  /**
+   * Returns `Ok(nullable)` unless `value` is null or undefined; otherwise returns
+   * `Err(error)`.
+   */
   fromNullableOr,
 
   // @copy-comment
+  /**
+   * Returns `Ok(nullable)` unless `nullable` is null or undefined; otherwise
+   * returns `Err(f())`.
+   */
   fromNullableOrElse,
 
   // @copy-comment
-  fromResults,
+  fromTruthyOr,
 
   // @copy-comment
+  fromTruthyOrElse,
+
+  // @copy-comment
+  /**
+   * Collects a sequence of results into a single result containing the `Ok`
+   * values. If any of the inputs is `Err(e)`, stopes immediately and returns
+   * `Err(e)`.
+   */
+  takeUnlessErr,
+
+  // @copy-comment
+  /**
+   * Tests wether an unknown value is an instance of `Err`.
+   */
   isErr,
 
   // @copy-comment
+  /**
+   * Tests wether an unknown value is an instance of `Ok`.
+   */
   isOk,
 
   // @copy-comment
@@ -208,18 +318,41 @@ export const Result = {
    */
   isResult,
 
+  // @copy-comment
+  /**
+   * Collects `e` for every `Err(e)` in `results` into a new array which is then
+   * returned.
+   */
+  unwrapErrs,
+
+  // @copy-comment
+  /**
+   * Collects `x` for every `Ok(x)` in `results` into a one array and `e` from
+   * every `Err(e)` into another, and returns both arrays.
+   */
+  unwrapResults,
+
+  // @copy-comment
+  /**
+   * Collects `x` for every `Ok(x)` in `results` into a new array which is then
+   * returned.
+   */
+  unwrapOks,
+
+  // @copy-comment
+  /**
+   * Collects `x` for every `Ok(x)` in `results` into a new array which is then
+   * returned.
+   */
+  unwrapValues: unwrapOks,
+
+  // @copy-comment
   /**
    * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
    *
-   * Its approximate inverse is {@link Result#unwrap}.
+   * Its inverse is {@link Result#unwrap}.
    */
-  try<T>(f: () => T): Result<T, unknown> {
-    try {
-      return Ok(f());
-    } catch (error) {
-      return Err(error);
-    }
-  },
+  try: tryFrom,
 };
 
 export namespace Result {
@@ -255,6 +388,7 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   abstract andThen<R, RE>(
     f: (value: T) => Result<R, RE>,
   ): Err<T, E> | Result<R, RE>;
+
   /**
    * Tests if two `Result` values are equal, i.e. both `Err(x)` and `Err(y)`, or
    * `Ok(x)` and `Ok(y)`, where `x` and `y` are equal.

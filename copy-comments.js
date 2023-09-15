@@ -6,7 +6,7 @@ function main() {
   }
 }
 
-function matchDefinition(line) {
+function matchDefinition(line, forTarget = false) {
   let m = /^ *(?:export )?(?:function|const|(type|interface)) ([a-zA-Z]+)/.exec(
     line,
   );
@@ -14,11 +14,25 @@ function matchDefinition(line) {
     let [, keyword, ident] = m;
     return keyword ? "type " + ident : ident;
   }
-  m = /^ *([a-zA-Z]+),$/.exec(line);
+  m =
+    /^ *(?:[a-zA-Z]+\.[a-zA-Z]+) *= ([a-zA-Z]+);$/.exec(line) ||
+    /^ *([a-zA-Z]+)(?:: ([a-zA-Z]+))?,$/.exec(line);
   if (m) {
-    return m[1];
+    return forTarget && m[2] ? m[2] : m[1];
   }
-  return null;
+  return undefined;
+}
+
+function parseDirective(line) {
+  const m = /^( *)\/\/ *@copy-comment(?: ((?:type )?[a-zA-Z]+))?/.exec(line);
+  if (m) {
+    return { indent: m[1], name: m[2] };
+  }
+  return undefined;
+}
+
+function trace(...args) {
+  //console.log(...args);
 }
 
 function processFile(fileName) {
@@ -28,23 +42,33 @@ function processFile(fileName) {
   let state = "searching";
   let comment;
   let indent;
+  let toCopyFrom;
   const linesOut = [];
   let lineNo = 0;
+
   for (const line of lines) {
+    ++lineNo;
+    trace(lineNo, state, line);
+
     const die = () => {
-      throw Error(`Failed at line number ${lineNo} in state ${state}: ${line}`);
+      throw Error(
+        `Failed at line number ${lineNo} in state ${state}: \`${line}\``,
+      );
     };
+
     const insertCopy = () => {
-      const id = matchDefinition(line);
-      if (!id) die();
-      const comment = comments.get(id);
+      const name = toCopyFrom || matchDefinition(line, true);
+      trace("inserting comment from", name);
+      if (!name) die();
+      const comment = comments.get(name);
       if (comment) {
         linesOut.push(...comment.map((line) => indent + line));
       }
       state = "searching";
     };
-    ++lineNo;
+
     let keepLine = true;
+
     switch (state) {
       case "searching":
         if (line.trim() === "/**") {
@@ -52,12 +76,14 @@ function processFile(fileName) {
           state = "saving_comment";
           break;
         }
-        const m = /^( *)\/\/ *@copy-comment/.exec(line);
-        if (m) {
-          indent = m[1];
-          state = "pre_insert_comment";
+        const directive = parseDirective(line);
+        if (directive) {
+          indent = directive.indent;
+          toCopyFrom = directive.name;
+          state = "after_directive";
         }
         break;
+
       case "saving_comment": {
         comment.push(line);
         if (line.includes("*/")) {
@@ -65,15 +91,17 @@ function processFile(fileName) {
         }
         break;
       }
+
       case "after_comment": {
-        const id = matchDefinition(line);
-        if (id) {
-          comments.set(id, comment);
+        const name = matchDefinition(line);
+        if (name) {
+          comments.set(name, comment);
         }
         state = "searching";
         break;
       }
-      case "pre_insert_comment": {
+
+      case "after_directive": {
         if (line.trim() === "/**") {
           keepLine = false;
           state = "deleting_comment";
@@ -82,6 +110,7 @@ function processFile(fileName) {
         }
         break;
       }
+
       case "deleting_comment": {
         keepLine = false;
         if (line.endsWith("*/")) {
@@ -89,6 +118,7 @@ function processFile(fileName) {
         }
         break;
       }
+
       case "deleted_comment": {
         insertCopy();
         break;
