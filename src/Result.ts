@@ -1,5 +1,5 @@
 import { None, Option, Some, constNone, constSome } from "./Option";
-import { Tappable } from "./Tappable";
+import { SingletonMonad } from "./common";
 
 /**
  * A type that can contain a succes value of type `T` or an error value of type
@@ -69,28 +69,6 @@ function equals(
 }
 
 /**
- * Returns `Ok(nullable)` unless `value` is null or undefined; otherwise returns
- * `Err(error)`.
- */
-export function fromNullableOr<T, E>(
-  error: E,
-  nullable: T,
-): Result<NonNullable<T>, E> {
-  return nullable == null ? Err(error) : Ok(nullable);
-}
-
-/**
- * Returns `Ok(nullable)` unless `nullable` is null or undefined; otherwise
- * returns `Err(f())`.
- */
-export function fromNullableOrElse<T, E>(
-  f: () => E,
-  nullable: T,
-): Result<NonNullable<T>, E> {
-  return nullable == null ? Err(f()) : Ok(nullable);
-}
-
-/**
  * Converts a promise that resolves to `x` into a promise that resolves to
  * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
  * resolves to `Err(e)`.
@@ -102,26 +80,6 @@ export function fromPromise<T>(
     (value) => Ok(value),
     (error) => Err(error),
   );
-}
-
-/**
- * Returns `Ok(value)` if `Boolean(value)`, otherwise returns `Err(error)`.
- */
-function fromTruthyOr<T, E>(
-  error: E,
-  value: T,
-): Result<NonNullable<T>, E> {
-  return value ? Ok(value) : Err(error);
-}
-
-/**
- * Returns `Ok(value)` if `Boolean(value)`, otherwise returns `Err(f())`.
- */
-function fromTruthyOrElse<T, E>(
-  f: () => E,
-  value: T,
-): Result<NonNullable<T>, E> {
-  return value ? Ok(value) : Err(f());
 }
 
 /**
@@ -195,7 +153,9 @@ export function unwrapErrs<T, E>(results: Iterable<Result<T, E>>): E[] {
  * Collects `x` for every `Ok(x)` in `results` into a one array and `e` from
  * every `Err(e)` into another, and returns both arrays.
  */
-export function unwrapResults<T, E>(results: Iterable<Result<T, E>>): [T[], E[]] {
+export function unwrapResults<T, E>(
+  results: Iterable<Result<T, E>>,
+): [T[], E[]] {
   const values: T[] = [];
   const errors: E[] = [];
   for (const result of results) {
@@ -271,26 +231,6 @@ export const Result = {
    * resolves to `Err(e)`.
    */
   fromPromise,
-
-  // @copy-comment
-  /**
-   * Returns `Ok(nullable)` unless `value` is null or undefined; otherwise returns
-   * `Err(error)`.
-   */
-  fromNullableOr,
-
-  // @copy-comment
-  /**
-   * Returns `Ok(nullable)` unless `nullable` is null or undefined; otherwise
-   * returns `Err(f())`.
-   */
-  fromNullableOrElse,
-
-  // @copy-comment
-  fromTruthyOr,
-
-  // @copy-comment
-  fromTruthyOrElse,
 
   // @copy-comment
   /**
@@ -372,9 +312,12 @@ export namespace Result {
 /**
  * The interface implemented by {@link Result}.
  */
-abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
-  abstract [Symbol.iterator](): Iterator<T>;
-
+export abstract class ResultBase<T, E> extends SingletonMonad<
+  T,
+  Ok<T, E>,
+  E,
+  Err<T, E>
+> {
   /**
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
    * `this`.
@@ -385,9 +328,7 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
    * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
    * `this`.
    */
-  abstract andThen<R, RE>(
-    f: (value: T) => Result<R, RE>,
-  ): Err<T, E> | Result<R, RE>;
+  abstract andThen<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE>;
 
   /**
    * Tests if two `Result` values are equal, i.e. both `Err(x)` and `Err(y)`, or
@@ -446,9 +387,18 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   abstract expectErr(message: string | (() => string)): E;
 
   /**
-   * Tests whether `this` does not contain a value.
+   * Synonym for `this.isOk()`.
    */
-  abstract isErr(): this is Err<T, E>;
+  hasValue(): this is Ok<T, E> {
+    return this instanceof OkImpl;
+  }
+
+  /**
+   * Tests whether `this` is `Err(e)`.
+   */
+  isErr(): this is Err<T, E> {
+    return !this.hasValue();
+  }
 
   /**
    * Tests whether `this` is an `Err(e)` for which `p(e)` is a truthy value.
@@ -458,7 +408,9 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   /**
    * Tests whether `this` is `Ok(_)`.
    */
-  abstract isOk(): this is Ok<T, E>;
+  isOk(): this is Ok<T, E> {
+    return this.hasValue();
+  }
 
   /**
    * Tests whether `this` is an `Ok(x)` for which `p(x)` is a truthy value.
@@ -468,7 +420,7 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   /**
    * An alias of `andThen`.
    */
-  flatMap<R, RE>(f: (value: T) => Result<R, RE>): Err<T, E> | Result<R, RE> {
+   flatMap<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE> {
     return this.andThen(f);
   }
 
@@ -515,26 +467,6 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   ): Result<NonNullable<R>, D | E>;
 
   /**
-   * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
-   * `defaultValue`.
-   */
-  abstract mapOr<D, R>(defaultValue: D, f: (value: T) => R): D | R;
-
-  /**
-   * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
-   * `d()`.
-   */
-  abstract mapOrElse<D, R>(d: () => D, f: (value: T) => R): D | R;
-
-  /**
-   * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
-   * `undefined`.
-   *
-   * Equivalent to `this.map(f).toNullable()`.
-   */
-  abstract mapOrUndef<R>(f: (value: T) => R): R | undefined;
-
-  /**
    * If `this` is `Ok(x)`, returns `Some(x)`, otherwise returns `None()`.
    */
   abstract ok(): Option<T>;
@@ -552,13 +484,6 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   abstract orElse<R, RE>(
     d: (error: E) => Result<R, RE>,
   ): Ok<T, E> | Result<R, RE>;
-
-  /**
-   * Alias of {@link unwrapOrUndef}.
-   */
-  toNullable(): T | undefined {
-    return this.unwrapOrUndef();
-  }
 
   /**
    * If `this` is `Err(e)`, returns `e`, otherwise throws an error. If
@@ -582,19 +507,10 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
   abstract tapErr(f: (error: E) => void): this;
 
   /**
-   * Calls `f(x)` for its side effects if `this` is `Ok(x)`.
-   *
-   * Roughly equivalent to `this.mapOrElse(() => {}, f)`.
-   *
-   * @see {@link tap}, {@link tapErr}, {@link mapOrElse}
+   * Alias of {@link tapValue}.
    */
-  abstract tapOk(f: (value: T) => void): this;
-
-  /**
-   * An alias of {@link flatten}.
-   */
-  join<T, E1, E2>(this: Result<Result<T, E1>, E2>): Result<T, E1 | E2> {
-    return this.flatten();
+  tapOk(f: (value: T) => void): this {
+    return this.tapValue(f);
   }
 
   /**
@@ -612,37 +528,6 @@ abstract class ResultBase<T, E> extends Tappable implements Iterable<T> {
    *
    */
   abstract transpose<T, E>(this: Result<Option<T>, E>): Option<Result<T, E>>;
-
-  /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise throws an error. If
-   * `errorFactory` is provided, it is called to generate the value to be
-   abstract * thrown; otherise throws `e` where `this` is `Err(e)`.
-   */
-  abstract unwrap(errorFactory?: () => unknown): T;
-
-  /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise returns `defaultValue`.
-   */
-  abstract unwrapOr<D>(defaultValue?: D): D | T | undefined;
-
-  /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise returns `f()`.
-   */
-  abstract unwrapOrElse<R>(d: (error: E) => R): T | R;
-
-  /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise returns `undefined as T`.
-   */
-  abstract unwrapUnchecked(): T;
-
-  /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise returns `undefined`.
-   *
-   * Equivalent to `this.unwrapOr(undefined)`.
-   *
-   * @see {@link mapOrUndef}
-   */
-  abstract unwrapOrUndef(): T | undefined;
 }
 
 /**
@@ -658,15 +543,11 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     super();
   }
 
-  [Symbol.iterator](): Iterator<T> {
-    return [this.value].values();
-  }
-
   and<T2, E2>(other: Result<T2, E2>): Result<T2, E2> {
     return other;
   }
 
-  andThen<R, RE>(f: (value: T) => Result<R, RE>): Result<R, RE> {
+  andThen<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE> {
     return f(this.value);
   }
 
@@ -715,14 +596,14 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     defaultError: D,
     f: (value: T) => R | undefined | null,
   ): Result<NonNullable<R>, D | E> {
-    return fromNullableOr(defaultError, f(this.value));
+    return Option.fromNullable(f(this.value)).okOr(defaultError);
   }
 
   mapNullableOrElse<D, R>(
     d: () => D,
     f: (value: T) => R | undefined | null,
   ): Result<NonNullable<R>, D | E> {
-    return fromNullableOrElse(d, f(this.value));
+    return Option.fromNullable(f(this.value)).okOrElse(d);
   }
 
   mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
@@ -730,10 +611,6 @@ class OkImpl<T, E> extends ResultBase<T, E> {
   }
 
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R {
-    return f(this.value);
-  }
-
-  mapOrUndef<R>(f: (value: T) => R): R {
     return f(this.value);
   }
 
@@ -768,11 +645,6 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return this;
   }
 
-  tapOk(f: (value: T) => void): this {
-    f(this.value);
-    return this;
-  }
-
   /**
    * Returns `this` with `E` converted to `E2`.  This operation is type-safe and
    * always succeeds.
@@ -792,22 +664,6 @@ class OkImpl<T, E> extends ResultBase<T, E> {
   unwrapErrUnchecked(): E {
     return undefined as E;
   }
-
-  unwrapOr<D>(defaultValue: D): T | D {
-    return this.value;
-  }
-
-  unwrapOrElse<R>(d: (error: E) => R): T {
-    return this.value;
-  }
-
-  unwrapOrUndef(): T {
-    return this.value;
-  }
-
-  unwrapUnchecked(): T {
-    return this.value;
-  }
 }
 
 /**
@@ -823,16 +679,12 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     super();
   }
 
-  [Symbol.iterator](): Iterator<T> {
-    return [].values();
-  }
-
   and<T2, E2>(other: Result<T2, E2>): Err<T, E> {
     return this;
   }
 
-  andThen<R, RE>(f: (value: T) => Result<R, RE>): Err<T, E> {
-    return this;
+  andThen<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE> {
+    return this.withType<R>();
   }
 
   flatten<T, E1, E2>(this: Result<Result<T, E1>, E2>): Result<T, E1 | E2> {
@@ -891,10 +743,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return d(this.error);
   }
 
-  mapOrUndef<R>(f: (value: T) => R): undefined {
-    return undefined;
-  }
-
   mapNullableOr<D, R>(
     defaultError: D,
     f: (value: T) => R | undefined | null,
@@ -918,10 +766,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return this;
   }
 
-  tapOk(f: (value: T) => void): this {
-    return this;
-  }
-
   toPromise(): Promise<T> {
     return Promise.reject(this.error);
   }
@@ -936,22 +780,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
 
   unwrap(errorFactory?: () => unknown): never {
     throw errorFactory ? errorFactory() : this.error;
-  }
-
-  unwrapOr<D>(defaultValue: D): D {
-    return defaultValue;
-  }
-
-  unwrapOrElse<R>(d: (error: E) => R): R {
-    return d(this.error);
-  }
-
-  unwrapUnchecked(): T {
-    return undefined as T;
-  }
-
-  unwrapOrUndef(): undefined {
-    return undefined;
   }
 
   unwrapErr(errorFactory?: () => unknown): E {

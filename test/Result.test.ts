@@ -7,8 +7,6 @@ import {
   Some,
   constErr,
   constOk,
-  fromNullableOr,
-  fromNullableOrElse,
   fromPromise,
   isErr,
   isOk,
@@ -17,17 +15,21 @@ import {
   unwrapErrs,
   unwrapResults,
   unwrapOks,
+  ResultBase,
 } from "../src/index";
 import {
   CallCounter,
   E,
   E2,
+  MaybeParameters,
+  MaybeReturnType,
   R,
   SameType,
   T,
   expectArgs,
   expectType,
   notCalled,
+  testEachMethod,
   theE,
   theE2,
   theR,
@@ -43,13 +45,9 @@ describe("Result functions", () => {
     expect(Result.Ok).toBe(Ok);
     expect(Result.constOk).toBe(constOk);
     expect(Result.constErr).toBe(constErr);
-    expect(Result.fromNullableOr).toBe(fromNullableOr);
-    expect(Result.fromNullableOrElse).toBe(fromNullableOrElse);
     expect(Result.isErr).toBe(isErr);
     expect(Result.isOk).toBe(isOk);
     expect(Result.isResult).toBe(isResult);
-    expect(Result.fromNullableOr).toBe(fromNullableOr);
-    expect(Result.fromNullableOrElse).toBe(fromNullableOrElse);
     expect(Result.fromPromise).toBe(fromPromise);
     expect(Result.takeUnlessErr).toBe(takeUnlessErr);
     expect(Result.unwrapErrs).toBe(unwrapErrs);
@@ -87,20 +85,6 @@ describe("Result functions", () => {
     testEqualsFn(Result.equals);
   });
 
-  test("fromNullableOr", () => {
-    expect(fromNullableOr(theE, null).unwrapErr()).toBe(theE);
-    expect(fromNullableOr(theE, undefined).unwrapErr()).toBe(theE);
-    expect(fromNullableOr(theE, theT).unwrap()).toBe(theT);
-  });
-
-  test("fromNullableOrElse", () => {
-    expect(fromNullableOrElse(expectArgs(theE), null).unwrapErr()).toBe(theE);
-    expect(fromNullableOrElse(expectArgs(theE), undefined).unwrapErr()).toBe(
-      theE,
-    );
-    expect(fromNullableOrElse(notCalled, theT).unwrap()).toBe(theT);
-  });
-
   test("fromPromise", async () => {
     expect((await Result.fromPromise(Promise.resolve(theT))).unwrap()).toBe(
       theT,
@@ -108,24 +92,6 @@ describe("Result functions", () => {
     expect((await Result.fromPromise(Promise.reject(theE))).unwrapErr()).toBe(
       theE,
     );
-  });
-
-  test("fromTruthyOr", () => {
-    expect(Result.fromTruthyOr(theE, true)).toEqual(Ok(true));
-    expect(Result.fromTruthyOr(theE, null)).toEqual(Err(theE));
-    expect(Result.fromTruthyOr(theE, undefined)).toEqual(Err(theE));
-    expect(Result.fromTruthyOr(theE, 0)).toEqual(Err(theE));
-    expect(Result.fromTruthyOr(theE, "")).toEqual(Err(theE));
-    expect(Result.fromTruthyOr(theE, false)).toEqual(Err(theE));
-  });
-
-  test("fromTruthyOrElse", () => {
-    expect(Result.fromTruthyOrElse(() => theE, true)).toEqual(Ok(true));
-    expect(Result.fromTruthyOrElse(() => theE, null)).toEqual(Err(theE));
-    expect(Result.fromTruthyOrElse(() => theE, undefined)).toEqual(Err(theE));
-    expect(Result.fromTruthyOrElse(() => theE, 0)).toEqual(Err(theE));
-    expect(Result.fromTruthyOrElse(() => theE, "")).toEqual(Err(theE));
-    expect(Result.fromTruthyOrElse(() => theE, false)).toEqual(Err(theE));
   });
 
   test("isErr", () => {
@@ -174,7 +140,7 @@ describe("Result functions", () => {
     ).toBe(theT);
   });
 
-  const toUnwrap: Result<number, string>[] = [Ok(1), Err("2"), Ok(3), Err("4")]
+  const toUnwrap: Result<number, string>[] = [Ok(1), Err("2"), Ok(3), Err("4")];
 
   test("unwrapErrs", () => {
     expect(unwrapErrs(toUnwrap)).toEqual(["2", "4"]);
@@ -188,7 +154,10 @@ describe("Result functions", () => {
   });
 
   test("unwrapResults", () => {
-    expect(unwrapResults(toUnwrap)).toEqual([[1, 3], ["2", "4"]]);
+    expect(unwrapResults(toUnwrap)).toEqual([
+      [1, 3],
+      ["2", "4"],
+    ]);
   });
 });
 
@@ -205,13 +174,14 @@ describe("Result methods", () => {
     expect(Err(theT).and(Err(theE)).unwrapErr()).toBe(theT);
   });
 
-  test.each([
-    ["andThen", (x: Result<T, E>, f: (arg: T) => Result<R, E>) => x.andThen(f)],
-    ["flatMap", (x: Result<T, E>, f: (arg: T) => Result<R, E>) => x.flatMap(f)],
-  ])("%s", (_name, andThen) => {
-    expect(andThen(Ok(theT), expectArgs(Ok(theR), theT)).unwrap()).toBe(theR);
-    expect(andThen(Err(theE), notCalled).unwrapErr()).toBe(theE);
-  });
+  testEachMethod(
+    ResultBase.prototype.andThen,
+    ["andThen"],
+    (_name, andThen) => {
+      expect(andThen(Ok(theT), expectArgs(Ok(theR), theT)).unwrap()).toBe(theR);
+      expect(andThen(Err(theE), notCalled).unwrapErr()).toBe(theE);
+    },
+  );
 
   test("error", () => {
     expect(constErr(theT).error).toBe(theT);
@@ -232,10 +202,14 @@ describe("Result methods", () => {
     expect(Err(theE).isErrAnd(expectArgs(false, theE))).toBe(false);
   });
 
-  test("isOk", () => {
-    expect(Ok(0).isOk()).toBe(true);
-    expect(Err(theT).isOk()).toBe(false);
-  });
+  testEachMethod(
+    ResultBase.prototype.hasValue,
+    ["isOk", "hasValue"],
+    (_, isOk) => {
+      expect(isOk(Ok(0))).toBe(true);
+      expect(isOk(Err(theT))).toBe(false);
+    },
+  );
 
   test("isOkAnd", () => {
     expect(Ok(theT).isOkAnd(expectArgs(true, theT))).toBe(true);
@@ -266,14 +240,14 @@ describe("Result methods", () => {
     expect(Err(theT).err().unwrap()).toBe(theT);
   });
 
-  test.each([
-    ["flatten", (x: Result<Result<T, E>, E2>) => x.flatten()],
-    ["join", (x: Result<Result<T, E>, E2>) => x.join()],
-  ])("%s", (_name, flatten) => {
-    expect(flatten(Ok(Ok(theT)))).toEqual(Ok(theT));
-    expect(flatten(Ok(Err(theE)))).toEqual(Err(theE));
-    expect(flatten(Err<Result<T, E>, E2>(theE2))).toEqual(Err(theE2));
-  });
+  test.each([["flatten", (x: Result<Result<T, E>, E2>) => x.flatten()]])(
+    "%s",
+    (_name, flatten) => {
+      expect(flatten(Ok(Ok(theT)))).toEqual(Ok(theT));
+      expect(flatten(Ok(Err(theE)))).toEqual(Err(theE));
+      expect(flatten(Err<Result<T, E>, E2>(theE2))).toEqual(Err(theE2));
+    },
+  );
 
   test("map", () => {
     expect(
@@ -531,3 +505,20 @@ function testEqualsFn(
   expect(eq(Ok(theT), Err(theE), notCalled)).toBe(false);
   expect(eq(Err(theE), Ok(theT), notCalled)).toBe(false);
 }
+
+describe("recipes", () => {
+  test("fromNullableOr", () => {
+    expect(Option.fromNullable(null).okOr(theE)).toEqual(Err(theE));
+    expect(Option.fromNullable(undefined).okOr(theE)).toEqual(Err(theE));
+    expect(Option.fromNullable(theT).okOr(theE)).toEqual(Ok(theT));
+  });
+
+  test("fromTruthyOr", () => {
+    expect(Some("hello").filter(Boolean).okOr(theE)).toEqual(Ok("hello"));
+    expect(Some(null).filter(Boolean).okOr(theE)).toEqual(Err(theE));
+    expect(Some(undefined).filter(Boolean).okOr(theE)).toEqual(Err(theE));
+    expect(Some(0).filter(Boolean).okOr(theE)).toEqual(Err(theE));
+    expect(Some("").filter(Boolean).okOr(theE)).toEqual(Err(theE));
+    expect(Some(false).filter(Boolean).okOr(theE)).toEqual(Err(theE));
+  });
+});

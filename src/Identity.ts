@@ -1,5 +1,5 @@
 import { Ok, Result } from "./Result";
-import { Tappable } from "./Tappable";
+import { SingletonMonad } from "./common";
 
 /**
  * A trival monad that simply contains a single value.  This type has many of
@@ -49,7 +49,9 @@ Identity.isIdentity = isIdentity;
  * Collects `x` for every `Identity(x)` into an array `a`. and returns
  * `Identity(a)`.
  */
-export function takeIdentities<T>(identities: Iterable<Identity<T>>): Identity<T[]> {
+export function takeIdentities<T>(
+  identities: Iterable<Identity<T>>,
+): Identity<T[]> {
   return Identity(unwrapIdentities(identities));
 }
 
@@ -83,7 +85,7 @@ Identity.unwrapIdentities = unwrapIdentities;
  */
 Identity.unwrapValues = unwrapIdentities;
 
-export class IdentityImpl<T> extends Tappable implements Iterable<T> {
+export class IdentityImpl<T> extends SingletonMonad<T, Identity<T>, never, never> implements Iterable<T> {
   constructor(
     /**
      * The value contained in this monad.
@@ -91,13 +93,6 @@ export class IdentityImpl<T> extends Tappable implements Iterable<T> {
     readonly value: T,
   ) {
     super();
-  }
-
-  /**
-   * Returns an iterator that yields `this.value`.
-   */
-  [Symbol.iterator](): Iterator<T> {
-    return [this.value].values();
   }
 
   /**
@@ -143,13 +138,6 @@ export class IdentityImpl<T> extends Tappable implements Iterable<T> {
    * Returns `this.value`.
    */
   flatten<T>(this: Identity<Identity<T>>): Identity<T> {
-    return this.value;
-  }
-
-  /**
-   * Alias of {@link flatten}.
-   */
-  join<T>(this: Identity<Identity<T>>): Identity<T> {
     return this.value;
   }
 
@@ -202,51 +190,8 @@ export class IdentityImpl<T> extends Tappable implements Iterable<T> {
     return Ok(this.value);
   }
 
-  /**
-   * Calls `f(this.value)` and returns `this`.
-   */
-  tapIdentity(f: (value: T) => void): this {
-    f(this.value);
-    return this;
-  }
-
   toString(): string {
     return `Identity(${this.value})`;
-  }
-
-  /**
-   * Returns `this.value`.
-   */
-  unwrap(_?: unknown): T {
-    return this.value;
-  }
-
-  /**
-   * Returns `this.value`.
-   */
-  unwrapOr(_?: unknown): T {
-    return this.value;
-  }
-
-  /**
-   * Returns `this.value`.
-   */
-  unwrapOrElse(_?: unknown): T {
-    return this.value;
-  }
-
-  /**
-   * Returns `this.value`.
-   */
-  unwrapOrUndef(): T {
-    return this.value;
-  }
-
-  /**
-   * Returns `this.value`.
-   */
-  unwrapUnchecked(arg?: unknown): T {
-    return this.value;
   }
 
   /**

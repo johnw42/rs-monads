@@ -21,6 +21,10 @@ few patterns.
     - [Side Effects](#side-effects)
     - [Manipulating collections of monad instances](#manipulating-collections-of-monad-instances)
     - [Converting between exceptions, promises and `Result`](#converting-between-exceptions-promises-and-result)
+  - [Recipes](#recipes)
+    - [Convert truthy values to `Some`](#convert-truthy-values-to-some)
+    - [Convert `NaN` values to `None`](#convert-nan-values-to-none)
+    - [Convert nullish values to `Ok`, or supply an error](#convert-nullish-values-to-ok-or-supply-an-error)
   - [Alternatives](#alternatives)
     - [Uninteresting Forks](#uninteresting-forks)
 
@@ -81,6 +85,7 @@ function pipeline2(a: A | undefined): D | undefined {
 
 ## Types Defined by This Package
 
+---
 **`Option<T> = Option.Some<T> | Option.None<T>`**
 
 A type that may or may not contain a value of type `T`. `Option.Some<T>` contains a
@@ -88,7 +93,6 @@ value and `Option.None<T>` does not. These subtypes are also aliased as
 `Some<T>` and `None<T>`.
 
 ---
-
 **`Result<T,E> = Result.Ok<T,E> | Result.Err<T,E>`**
 
 A type that value of type `T | E` `Result.Ok<T,E>` contains a
@@ -97,8 +101,7 @@ represents an error). These subtypes are also aliased as `Ok<T,E>` and
 `Err<T,E>`.
 
 ---
-
-**`Identity`**
+**`Identity<T>`**
 
 The trivial monad. It is simply a box that holds a value. Sometimes useful for
 sequencing function calls as if they were methods.
@@ -113,7 +116,6 @@ instance of a monad type.
 ### Creating values
 
 ---
-
 **`Option.Some(x)`** ★  
 **`Option.None()`** ★  
 **`Result.Ok(x)`** ★  
@@ -123,7 +125,6 @@ instance of a monad type.
 Creates an object of the specified type holding the given value.
 
 ---
-
 **`Option.constSome(x)`** ★  
 **`Option.constNone(x)`** ★  
 **`Option.constOk(x)`** ★  
@@ -133,50 +134,37 @@ Alternate versions of the similarly-named functions above with a more precise
 return type suitable for intializing constants.
 
 ---
-
 **`Option.fromNullable(x)`** ★  
-**`Result.fromNullableOr(def, x)`** ★  
-**`Result.fromNullableOrElse(lazyDef, x)`** ★
-
-Wraps `x` as `Some(x)` or `Ok(x)` unless `x` is `null` or `undefined`,
-in which case it returns `None()`, `Err(def)` or `Err(lazyDef())`.
+Wraps `x` as `Some(x)` unless `x` is `null` or `undefined`, in which case it
+returns `None()`.  Combine with `okOr` or `okOrElse` to produce a `Result`
+instead.
 
 ---
-
-**`Option.fromTruthy(x)`** ★  
-**`Result.fromTruthyOr(def, x)`** ★  
-**`Result.fromTruthyOrElse(lazyDef, x)`** ★
-
-Wraps `x` as `Some(x)` or `Ok(x)` unless `!x`, in which case it returns
-`None()`, `Err(der)` or `Err(lazyDef())`.
 
 ### Extracting the contents of monad values
 
 ---
-
 **`m.unwrap()`**  
 **`m.expect("m should have a value")`**
 
-If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise throws an error. If `m`
-is `Err(e)`, `unwrap` throws `e`.
+If `m` is has a non-error value, returns `m.value`, otherwise throws an error.
+If `m` is `Err(e)`, `unwrap` throws `e`.
 
 ---
-
 **`m.unwrapOr(def)`**  
 **`m.unwrapOrElse(lazyDef)`**
 
-If `m` is `Some(x)` or `Ok(x)`, returns `x`, otherwise returns `def` or
+If `m` has a non-error value, returns `x.value`, otherwise returns `def` or
 `lazyDef()`.
 
 ---
+**`m.unwrapOrUndef()`**  
+**`m.toNullable()`**  
 
-**`m.unwrapOrUndef()`** and **`m.toNullable()`** (`Option`)
-
-These synonymous methods are the complement to `fromNullable`, `fromNullableOr`,
-and `fromNullableOrElse`. They are equivalent to `m.unwrapOr(undefined)`.
+These synonymous methods are the complement to `fromNullable`. They are
+equivalent to `m.unwrapOr(undefined)`.
 
 ---
-
 **`[...before, ...m, ...after]`**
 
 The monad types support the iterator protocol; `Some(x)` and `Ok(x)`, and
@@ -184,7 +172,6 @@ The monad types support the iterator protocol; `Some(x)` and `Ok(x)`, and
 allows optional values to be easily spliced into arrays.
 
 ---
-
 **Identity(x).value**  
 **Some(x).value**  
 **Ok(x).value**  
@@ -196,7 +183,6 @@ of `Option` and `Result`.
 ### Testing monad values
 
 ---
-
 **`Option.isOption(m)`** ★  
 **`Option.isOk(m)`** ★  
 **`Option.isNone(m)`** ★  
@@ -208,7 +194,6 @@ of `Option` and `Result`.
 Tests whether `m` is an instance of the corresponding type.
 
 ---
-
 **`m.isSome()`**  
 **`m.isNone()`**  
 **`m.isOk()`**  
@@ -217,7 +202,6 @@ Tests whether `m` is an instance of the corresponding type.
 Tests whether `m` is an instance of the corresponding type.
 
 ---
-
 **`m.isSomeAnd(p)`**  
 **`m.isOkAnd(p)`**  
 **`m.isErrAnd(p)`**  
@@ -227,7 +211,6 @@ Tests whether `m` is an instance of the corresponding type whose value
 statisifes the predicate `p`.
 
 ---
-
 **`m1.equals(m1)`**  
 **`m1.equals(m1, cmp)`** (for `Option` and `Identity`)  
 **`m1.equals(m1, cmpValues, cmpErrors)`** (for `Result`)
@@ -242,7 +225,6 @@ instances to determine equality. `cmp` and `cmpValues` are used to compare
 fields of `Error` instances.
 
 ---
-
 **`Option.equals(x, y, [cmp])`**  
 **`Identity.equals(x, y, [cmp])`**  
 **`Result.equals(x, y, [cmpValues, [cmpErrors]])`**
@@ -254,7 +236,6 @@ type.
 ### Transforming monad values
 
 ---
-
 **`m.map(f)`**
 
 Analogous to `Array.map`; applies `f` to transform the the inner value of a
@@ -267,7 +248,6 @@ Analogous to `Array.map`; applies `f` to transform the the inner value of a
 - `Identity(x)` ↦ `Identity(f(x))`
 
 ---
-
 **`m.andThen(f)`**  
 **`m.flatMap(f)`**
 
@@ -281,7 +261,6 @@ the the inner value of a `Some`, `Ok`, or `Identity` according to the following 
 - `Identity(x)` ↦ `f(x)`
 
 ---
-
 **`m.mapOr(def, f)`**  
 **`m.mapOrElse(lazyDef, f)`**  
 **`m.mapOrUndef(f)`**
@@ -291,11 +270,9 @@ These methods are shorthands for `m.mapOr(f).unwrapOr(def)`,
 respectively.
 
 ---
-
-**`m.mapNullable(f)`**  
-**`m.mapNullableOr(def, f)`**  
-**`m.mapNullableOrElse(lazyDef, f)`**  
-(not supported by `Identity`)
+**`m.mapNullable(f)`**  (for `Option`)
+**`m.mapNullableOr(def, f)`**  (for `Result`)
+**`m.mapNullableOrElse(lazyDef, f)`**  (for `Result`)
 
 Similar to `map`, except when `f` returns `undefined` or `null`. These methods
 obey the following rules:
@@ -310,7 +287,6 @@ obey the following rules:
 ### Side Effects
 
 ---
-
 **`m.tap(f)`**
 
 This method calls `f(m)`. Use this function to "tap into" a sequences of
@@ -323,22 +299,27 @@ return m
   .map(anotherTranformation);
 ```
 
----
+This method calls `f(m)`. Use this function to "tap into" a sequences of
+operations to do something like log an intermediate value:
 
-**`m.tapIdentity(f)`**  
+---
+**`m.tapValue(f)`**
 **`m.tapSome(f)`**  
-**`m.tapNone(f)`**  
 **`m.tapOk(f)`**  
+
+These specialized versions of `tap` call `f(m.value)` for its side effects if
+`m` has a non-error value.
+
+---
+**`m.tapNoValue(f)`**
+**`m.tapNone(f)`**  
 **`m.tapErr(f)`**
 
-These specialized versions of `tap` call `f` for its side effects if `m` is an
-instance of the corresponding monad subtype, passing the contained value as its
-argument (or no argument when `m` is `None()`).
+Thse function call `f()` (or `f(m.error)` for `tapErr`) if `m` has no non-error value.
 
 ### Manipulating collections of monad instances
 
 ---
-
 **`Option.takeUnlessNone(seq)`** ★  
 **`Result.takeUnlessErr(seq)`** ★
 
@@ -350,6 +331,7 @@ values. If iteration completes without encountering a `None` or `Err` instance,
 an array of `x` values is returned, wrapped with `Some` or `Ok`.
 
 The following code snippets are equivalent:
+
 ```ts
 Option.takeUnlessNone(step1()).mapOrElse(() => console.log("step1 failed"), step2);
 return;
@@ -371,26 +353,20 @@ return;
 ```
 
 ---
-
-**`Option.unwrapSomes(seq)`** ★  
-**`Option.unwrapValues(seq)`**   
-**`Result.unwrapOks(seq)`** ★  
-**`Result.unwrapValues(seq)`**   
-**`Identity.unwrapIdentities(seq)`** ★  
-**`Identity.unwrapValues(seq)`**   
+**`Option.unwrapValues(seq)`** ★  
+**`Result.unwrapValues(seq)`** ★  
+**`Identity.unwrapValues(seq)`** ★ 
 
 These functions filter out the `None` or `Err` instances in their input sequence
 and unwrap the remaining values into a new array. The roughly equivalent to
 `Array.from(seq).flatMap(m => Array.from(m))`.
 
 --- 
-
 **`Result.unwrapErrs(seq)`** ★
 
 Like `unwrapSomes`, but for `Err` values.
 
 ---
-
 **`Result.unwrapResults(seq)`** ★
 
 Like `[unwrapOks(seq), unwrapErrs(seq)]`, but only makes one pass
@@ -400,7 +376,6 @@ over the input sequences.
 ### Converting between exceptions, promises and `Result`
 
 ---
-
 **`Result.try(f)`**
 
 Calls a function, capturing any throw exception as an `Err` instance. Its
@@ -438,7 +413,6 @@ if (x !== undefined) {
 ```
 
 ---
-
 **`Result.fromPromise(p)`** ★  
 **`r.toPromise(q)`**
 
@@ -477,6 +451,20 @@ if (x !== undefined) {
   doSomethingElse(x);
 }
 ```
+
+## Recipes
+
+### Convert truthy values to `Some`
+
+`Some(x).filter(Boolean)`
+
+### Convert `NaN` values to `None`
+
+`Some(x).filterNot(Number.isNaN)`
+
+### Convert nullish values to `Ok`, or supply an error
+
+`Option.fromNullable(x).okOrElse(() => Error("expecting a value"))`
 
 ## Alternatives
 

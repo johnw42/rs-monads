@@ -87,13 +87,24 @@ describe("Option functions", () => {
     expect(Option.fromNullable(false)).toEqual(Some(false));
   });
 
-  test("fromTruthy", () => {
-    expect(Option.fromTruthy(true)).toEqual(Some(true));
-    expect(Option.fromTruthy(null)).toEqual(None());
-    expect(Option.fromTruthy(undefined)).toEqual(None());
-    expect(Option.fromTruthy(0)).toEqual(None());
-    expect(Option.fromTruthy("")).toEqual(None());
-    expect(Option.fromTruthy(false)).toEqual(None());
+  test("ifTypeIs", () => {
+    expect(Option.ifTypeIs("bigint", 0)).toEqual(None());
+    expect(Option.ifTypeIs("boolean", 0)).toEqual(None());
+    expect(Option.ifTypeIs("number", "")).toEqual(None());
+    expect(Option.ifTypeIs("object", 0)).toEqual(None());
+    expect(Option.ifTypeIs("string", 0)).toEqual(None());
+    expect(Option.ifTypeIs("symbol", 0)).toEqual(None());
+    expect(Option.ifTypeIs("undefined", 0)).toEqual(None());
+
+    expect(Option.ifTypeIs("bigint", 0n).unwrap() === 0n).toBe(true);
+    expect(Option.ifTypeIs("boolean", false)).toEqual(Some(false));
+    expect(Option.ifTypeIs("number", 0)).toEqual(Some(0));
+    expect(Option.ifTypeIs("object", null)).toEqual(Some(null));
+    expect(Option.ifTypeIs("string", "")).toEqual(Some(""));
+    expect(Option.ifTypeIs("symbol", Symbol.iterator)).toEqual(
+      Some(Symbol.iterator),
+    );
+    expect(Option.ifTypeIs("undefined", undefined)).toEqual(Some(undefined));
   });
 
   test("isOption", () => {
@@ -192,11 +203,15 @@ describe("Option methods", () => {
 
   test.each([
     ["flatten", (x: Option<Option<T>>) => x.flatten()],
-    ["join", (x: Option<Option<T>>) => x.join()],
   ])("%s", (_name, flatten) => {
     expect(flatten(Some(Some(theT))).unwrap()).toBe(theT);
     expect(flatten(Some(None())).isNone()).toBe(true);
     expect(flatten(None<Option<T>>()).isNone()).toBe(true);
+  });
+
+  test("hasValue", () => {
+    expect(Some(0).hasValue()).toBe(true);
+    expect(None().hasValue()).toBe(false);
   });
 
   test("isNone", () => {
@@ -427,3 +442,14 @@ function testEqualsFn(
   expect(eq(Some(theT), None(), notCalled)).toBe(false);
   expect(eq(None(), Some(theT), notCalled)).toBe(false);
 }
+
+describe("recipes", () => {
+  test("fromTruthy", () => {
+    expect(Some("hello").filter(Boolean)).toEqual(Some("hello"));
+    expect(Some(null).filter(Boolean)).toEqual(None());
+    expect(Some(undefined).filter(Boolean)).toEqual(None());
+    expect(Some(0).filter(Boolean)).toEqual(None());
+    expect(Some("").filter(Boolean)).toEqual(None());
+    expect(Some(false).filter(Boolean)).toEqual(None());
+  });
+})

@@ -1,5 +1,5 @@
 import { Err, Ok, Result, constErr, constOk } from "./Result";
-import { Tappable } from "./Tappable";
+import { SingletonMonad } from "./common";
 
 /**
  * A type that can contain a single value or no value.
@@ -65,9 +65,34 @@ function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
 /**
  * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
  */
-function fromTruthy<T>(value: T): Option<NonNullable<T>> {
-  return value ? Some(value) : None();
+function ifInstanceOf<C, T>(
+  ctor: { new (...args: any[]): C },
+  value: T,
+): Option<C & T> {
+  return value instanceof ctor ? Some(value) : None();
 }
+
+/**
+ * Returns `Some(value)` if `typeof value === typeName`, otherwise returns `None()`.
+ */
+function ifTypeIs<T extends keyof TypeRecord>(
+  typeName: keyof TypeRecord,
+  value: unknown,
+): Option<TypeForName<T>> {
+  return (typeof value === typeName ? Some(value) : None()) as any;
+}
+
+type TypeRecord = {
+  bigint: bigint;
+  boolean: boolean;
+  number: number;
+  object: object;
+  string: string;
+  symbol: symbol;
+  undefined: undefined;
+};
+
+type TypeForName<T extends keyof TypeRecord> = TypeRecord[T];
 
 /**
  * Tests whether `arg` is an instance of `Some`.
@@ -182,7 +207,10 @@ export const Option = {
   fromNullable,
 
   // @copy-comment
-  fromTruthy,
+  ifInstanceOf,
+
+  // @copy-comment
+  ifTypeIs,
 
   // @copy-comment
   /**
@@ -235,7 +263,7 @@ export namespace Option {
    * The subtype of `Option<T>` that does not contain a value.
    */
   export type None<T> = NoneImpl<T>;
-  
+
   // @copy-comment
   /**
    * The subtype of `Option<T>` that contains a value.
@@ -246,9 +274,12 @@ export namespace Option {
 /**
  * The interface implemented by {@link Option}.
  */
-abstract class OptionBase<T> extends Tappable implements Iterable<T> {
-  abstract [Symbol.iterator](): Iterator<T>;
-
+abstract class OptionBase<T> extends SingletonMonad<
+  T,
+  Some<T>,
+  never,
+  None<T>
+> {
   /**
    * If `this` is `Some(_)`, returns `other`, otherwise returns
    * `None()`.
@@ -260,7 +291,7 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
    * `None()`.
    */
   abstract andThen<R>(f: (value: T) => Option<R>): Option<R>;
-  
+
   /**
    * Tests if two `Option` values are equal, i.e. both `None()`, or `Some(x)`
    * and `Some(y)`, where `x` and `y` are equal.
@@ -279,8 +310,8 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
       return cmp
         ? cmp(this.value, that.value)
         : isOption(this.value) && isOption(that.value)
-          ? this.value.equals(that.value)
-          : (this.value as unknown) === (that.value as unknown);
+        ? this.value.equals(that.value)
+        : (this.value as unknown) === (that.value as unknown);
     }
     return false;
   }
@@ -294,12 +325,19 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
    */
   abstract expect(message: string | (() => string)): T;
 
-
   /**
    * Return `this` if `this` is `Some(x)` and `p(x)` returns a truthy
    * value, otherwise returns `None()`.
    */
   abstract filter(p: (value: T) => unknown): Option<T>;
+
+  /**
+   * Return `this` if `this` is `Some(x)` and `p(x)` returns a falsy
+   * value, otherwise returns `None()`.
+   */
+  filterNot(p: (value: T) => unknown): Option<T> {
+    return this.filter((x) => !p(x));
+  }
 
   /**
    * An alias of `andThen`.
@@ -312,6 +350,13 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
    * If `this` is `Some(Some(x))` returns `Some(x)`, otherwise returns `None()`.
    */
   abstract flatten<T>(this: Option<Option<T>>): Option<T>;
+
+  /**
+   * Synonym for `this.isSome()`.
+   */
+  hasValue(): this is Some<T> {
+    return this.isSome();
+  }
 
   /**
    * Tests whether `this` is `None()`.
@@ -329,13 +374,6 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
   abstract isSomeAnd(p: (value: T) => unknown): boolean;
 
   /**
-   * An alias of {@link flatten}.
-   */
-  join<T>(this: Option<Option<T>>): Option<T> {
-    return this.flatten();
-  }
-
-  /**
    * If `this` is `Some(x)`, returns `Some(f(x))`, otherwise returns
    * `None()`.
    */
@@ -348,28 +386,6 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
   abstract mapNullable<R>(
     f: (value: T) => R | undefined | null,
   ): Option<NonNullable<R>>;
-
-  /**
-   * If `this` is `Some(x)`, returns `f(x)`, otherwise returns
-   * `defaultValue`.
-   */
-  abstract mapOr<D, R>(defaultValue: D, f: (value: T) => R): D | R;
-
-  /**
-   * If `this` is `Some(x)`, returns `f(x)`, otherwise returns
-   * `d()`.
-   *
-   * @see {@link tapSome}, {@link tapNone}
-   */
-  abstract mapOrElse<D, R>(d: () => D, f: (value: T) => R): D | R;
-
-  /**
-   * If `this` is `Some(x)`, returns `f(x)`, otherwise returns
-   * `undefined`.
-   *
-   * Equivalent to `this.map(f).toNullable()`.
-   */
-  abstract mapOrUndef<R>(f: (value: T) => R): R | undefined;
 
   /**
    * If `this` is `Some(x)`, returns `Ok(x)`, otherwise returns `Err(error)`.
@@ -394,28 +410,17 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
   abstract orElse<R>(d: () => Option<R>): Option<T> | Option<R>;
 
   /**
-   * Calls `f()` for its side effects if `this` is `None()`.  Returns `this`.
-   *
-   * Equivalent to `this.mapOrElse(f, () => {})`.
-   *
-   * @see {@link tap}, {@link tapSome}, {@link mapOrElse}
+   * Alias of {@link tapNoValue}.
    */
-  abstract tapNone(f: () => void): this;
+  tapNone(f: () => void): this {
+    return this.tapNoValue(f);
+  }
 
   /**
-   * Calls `f(x)` for its side effects if `this` is `Some(x)`.  Returns `this`.
-   *
-   * Roughlyquivalent to `this.mapOrElse(() => {}, f)`.
-   *
-   * @see {@link tap}, {@link tapNone}, {@link mapOrElse}
+   * Alias of {@link tapValue}.
    */
-  abstract tapSome(f: (value: T) => void): this;
-
-  /**
-   * Alias of {@link unwrapOrUndef}.
-   */
-  toNullable(): T | undefined {
-    return this.unwrapOrUndef();
+  tapSome(f: (value: T) => void): this {
+    return this.tapValue(f);
   }
 
   /**
@@ -428,39 +433,6 @@ abstract class OptionBase<T> extends Tappable implements Iterable<T> {
    * It is the inverse of {@link Result#transpose}
    */
   abstract transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E>;
-
-  /**
-   * If `this` is `Some(x)`, returns `x`, otherwise throws an error. If
-   * `errorFactory` is provided, it is called to generate the value to be
-   * thrown.
-   */
-  abstract unwrap(errorFactory?: () => unknown): T;
-
-  /**
-   * If `this` is `Some(x)`, returns `x`, otherwise returns `defaultValue`.
-   *
-   * @see {@link #toNullable}
-   */
-  abstract unwrapOr<D>(defaultValue: D): D | T | undefined;
-
-  /**
-   * If `this` is `Some(x)`, returns `x`, otherwise returns `f()`.
-   */
-  abstract unwrapOrElse<R>(d: () => R): T | R;
-
-  /**
-   * If `this` is `Some(x)`, returns `x`, otherwise returns `undefined`.
-   *
-   * Equivalent to `this.unwrapOr(undefined)`.
-   *
-   * @see {@link mapOrUndef}
-   */
-  abstract unwrapOrUndef(): T | undefined;
-
-  /**
-   * If `this` is `Some(x)`, returns `x`, otherwise returns `undefined as T`.
-   */
-  abstract unwrapUnchecked(): T;
 
   /**
    abstract * If both or neither of `this` and `other` contain a value, returns `None()`;
@@ -492,10 +464,6 @@ class SomeImpl<T> extends OptionBase<T> {
     readonly value: T,
   ) {
     super();
-  }
-
-  [Symbol.iterator](): Iterator<T> {
-    return [this.value].values();
   }
 
   and<U>(other: Option<U>): Option<U> {
@@ -548,10 +516,6 @@ class SomeImpl<T> extends OptionBase<T> {
     return f(this.value);
   }
 
-  mapOrUndef<R>(f: (value: T) => R): R {
-    return f(this.value);
-  }
-
   okOr<E>(error: E): Ok<T, E> {
     return constOk(this.value);
   }
@@ -568,15 +532,6 @@ class SomeImpl<T> extends OptionBase<T> {
     return this;
   }
 
-  tapNone(f: () => void): this {
-    return this;
-  }
-
-  tapSome(f: (value: T) => void): this {
-    f(this.value);
-    return this;
-  }
-
   toString(): string {
     return `Some(${this.value})`;
   }
@@ -586,26 +541,6 @@ class SomeImpl<T> extends OptionBase<T> {
       (error: E) => Err(error),
       (value: T) => Ok(constSome(value)),
     );
-  }
-
-  unwrap(errorFactory?: () => unknown): T {
-    return this.value;
-  }
-
-  unwrapOr<D>(defaultValue: D): T {
-    return this.value;
-  }
-
-  unwrapOrElse<R>(d: () => R): T {
-    return this.value;
-  }
-
-  unwrapOrUndef(): T {
-    return this.value;
-  }
-
-  unwrapUnchecked(): T {
-    return this.value;
   }
 
   xor<U>(other: Option<U>): Option<T> | None<U> {
@@ -627,10 +562,6 @@ class SomeImpl<T> extends OptionBase<T> {
  * The implemention values returned by {@link None}.
  */
 class NoneImpl<T> extends OptionBase<T> {
-  [Symbol.iterator](): Iterator<T> {
-    return [].values();
-  }
-
   and<U>(other: Option<U>): None<U> {
     return constNone();
   }
@@ -679,10 +610,6 @@ class NoneImpl<T> extends OptionBase<T> {
     return d();
   }
 
-  mapOrUndef<R>(f: (value: T) => R): undefined {
-    return undefined;
-  }
-
   okOr<E>(error: E): Err<T, E> {
     return constErr(error);
   }
@@ -699,41 +626,12 @@ class NoneImpl<T> extends OptionBase<T> {
     return f();
   }
 
-  tapNone(f: () => void): this {
-    f();
-    return this;
-  }
-
-  tapSome(f: (value: T) => void): this {
-    return this;
-  }
-
   toString(): string {
     return "None()";
   }
 
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
     return Ok(None());
-  }
-
-  unwrap(errorFactory?: () => unknown): never {
-    throw errorFactory ? errorFactory() : new Error("Missing Option value.");
-  }
-
-  unwrapOr<D>(defaultValue: D): D | undefined {
-    return defaultValue;
-  }
-
-  unwrapOrElse<R>(f: () => R): R {
-    return f();
-  }
-
-  unwrapOrUndef(): undefined {
-    return undefined;
-  }
-
-  unwrapUnchecked(): T {
-    return undefined as T;
   }
 
   /**

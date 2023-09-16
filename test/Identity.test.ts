@@ -1,4 +1,9 @@
-import { Identity, isIdentity, takeIdentities, unwrapIdentities } from "../src/index";
+import {
+  Identity,
+  isIdentity,
+  takeIdentities,
+  unwrapIdentities,
+} from "../src/index";
 import {
   CallCounter,
   R,
@@ -48,12 +53,13 @@ describe("Identity functions", () => {
     expect(takeIdentities(wrapped)).toEqual(Identity(data));
   });
 
-
   test("unwrapIdentities", () => {
     const data = [1, 2, 3];
     const wrapped = data.map(Identity);
     expect(unwrapIdentities(wrapped)).toEqual(data);
-    expect(unwrapIdentities(wrapped)).toEqual(Array.from(wrapped).flatMap(m => Array.from(m)));
+    expect(unwrapIdentities(wrapped)).toEqual(
+      Array.from(wrapped).flatMap((m) => Array.from(m)),
+    );
   });
 });
 
@@ -80,12 +86,12 @@ describe("Identity methods", () => {
     );
   });
 
-  test.each([
-    ["flatten", (x: Identity<Identity<T>>) => x.flatten()],
-    ["join", (x: Identity<Identity<T>>) => x.join()],
-  ])("%s", (_name, flatten) => {
-    expect(flatten(Identity(Identity(theT))).unwrap()).toBe(theT);
-  });
+  test.each([["flatten", (x: Identity<Identity<T>>) => x.flatten()]])(
+    "%s",
+    (_name, flatten) => {
+      expect(flatten(Identity(Identity(theT))).unwrap()).toBe(theT);
+    },
+  );
 
   test("isIdentityAnd", () => {
     expect(Identity(theT).isIdentityAnd(expectArgs(true, theT))).toBe(true);
@@ -132,10 +138,10 @@ describe("Identity methods", () => {
     expect(someFunc).toHaveBeenCalledTimes(1);
   });
 
-  test("tapIdentity", () => {
+  test("tapValue", () => {
     const id = Identity(theT);
     const mockFunc = jest.fn(expectArgs(theR, theT));
-    expect(id.tapIdentity(mockFunc)).toBe(id);
+    expect(id.tapValue(mockFunc)).toBe(id);
     expect(mockFunc).toHaveBeenCalledTimes(1);
   });
 
