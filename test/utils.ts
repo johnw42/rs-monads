@@ -73,6 +73,19 @@ export function testEachMethod<C, A extends unknown[], R>(
   test.each(testEachParams(method, specs))("%s", testBody as any);
 }
 
+export function testMethod<T, P extends unknown[], R>(): <K extends keyof T>(
+  name: K,
+) => (testBody: (f: (thisArg: T, ...args: P) => R) => void) => void {
+  return (name) => (testBody) => {
+    test(name as string, () => {
+      testBody(
+        (thisArg: T, ...args: P): R =>
+          (thisArg[name] as any).call(thisArg, ...args),
+      );
+    });
+  };
+}
+
 // export function testEachParams<
 //   N extends string,
 //   M extends HasMethods<N>,

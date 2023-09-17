@@ -23,10 +23,26 @@ function matchDefinition(line, forTarget = false) {
   return undefined;
 }
 
-function parseDirective(line) {
+function parseCopyCommentDirective(line) {
   const m = /^( *)\/\/ *@copy-comment(?: ((?:type )?[a-zA-Z]+))?/.exec(line);
   if (m) {
     return { indent: m[1], name: m[2] };
+  }
+  return undefined;
+}
+
+function parseCopyTestDirective(line) {
+  const m = /^( *)\/\/ *@copy-test ([a-zA-Z]+)/.exec(line);
+  if (m) {
+    return { indent: m[1], name: m[2] };
+  }
+  return undefined;
+}
+
+function parseTestHeader(line) {
+  const m = /^(?: *)test\("([^"]+)",/.exec(line);
+  if (m) {
+    return { testName: m[1] };
   }
   return undefined;
 }
@@ -45,6 +61,9 @@ function processFile(fileName) {
   let toCopyFrom;
   const linesOut = [];
   let lineNo = 0;
+  let inputTestName;
+  let outputTestName;
+  let testLines;
 
   for (const line of lines) {
     ++lineNo;
@@ -67,32 +86,52 @@ function processFile(fileName) {
       state = "searching";
     };
 
+    const insertTestCopy = () => {
+      trace("inserting copy of test", inputTestName)
+    }
+
     let keepLine = true;
 
     switch (state) {
       case "searching":
         if (line.trim() === "/**") {
           comment = [line];
-          state = "saving_comment";
+          state = "savingComment";
           break;
         }
-        const directive = parseDirective(line);
-        if (directive) {
-          indent = directive.indent;
-          toCopyFrom = directive.name;
-          state = "after_directive";
+
+        const testHeader = parseTestHeader(line);
+        if (testHeader) {
+          inputTestName = testHeader.testName;
+          testLines = [line];
+          state = "savingTestLines";
         }
+
+        const commentDirective = parseCopyCommentDirective(line);
+        if (commentDirective) {
+          indent = commentDirective.indent;
+          toCopyFrom = commentDirective.name;
+          state = "afterCommentDirective";
+        }
+
+        const testDirective = parseCopyTestDirective(line);
+        if (testDirective) {
+          indent = testDirective.indent;
+          outputTestName = testDirective.name;
+          state = "afterTestDirective";
+        }
+
         break;
 
-      case "saving_comment": {
+      case "savingComment": {
         comment.push(line);
         if (line.includes("*/")) {
-          state = "after_comment";
+          state = "afterComment";
         }
         break;
       }
 
-      case "after_comment": {
+      case "afterComment": {
         const name = matchDefinition(line);
         if (name) {
           comments.set(name, comment);
@@ -101,26 +140,54 @@ function processFile(fileName) {
         break;
       }
 
-      case "after_directive": {
+      case "afterCommentDirective": {
         if (line.trim() === "/**") {
           keepLine = false;
-          state = "deleting_comment";
+          state = "deletingComment";
         } else {
           insertCopy();
         }
         break;
       }
 
-      case "deleting_comment": {
+      case "deletingComment": {
         keepLine = false;
         if (line.endsWith("*/")) {
-          state = "deleted_comment";
+          state = "deletedComment";
         }
         break;
       }
 
-      case "deleted_comment": {
+      case "deletedComment": {
         insertCopy();
+        break;
+      }
+
+      case "savingTestLines": {
+        testLines.push(line);
+        if (line === indent + "});") {
+          state = "searching";
+        }
+        break;
+      }
+
+      case "afterTestDirective": {
+        if (parseTestHeader(line)) {
+          keepLine = false;
+          state = "deletingTest";
+        } else {
+          insertTestCopy();
+          state = "searching";
+        }
+        break;
+      }
+
+      case "deletingTest": {
+        keepLine = false;
+        if (line === indent + "});") {
+          insertTestCopy();
+          state = "searching";
+        }
         break;
       }
     }

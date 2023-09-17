@@ -30,6 +30,7 @@ import {
   expectType,
   notCalled,
   testEachMethod,
+  testMethod,
   theE,
   theE2,
   theR,
@@ -174,14 +175,15 @@ describe("Result methods", () => {
     expect(Err(theT).and(Err(theE)).unwrapErr()).toBe(theT);
   });
 
-  testEachMethod(
-    ResultBase.prototype.andThen,
-    ["andThen"],
-    (_name, andThen) => {
-      expect(andThen(Ok(theT), expectArgs(Ok(theR), theT)).unwrap()).toBe(theR);
-      expect(andThen(Err(theE), notCalled).unwrapErr()).toBe(theE);
-    },
-  );
+  test("andThen", () => {
+    expect(
+      Ok(theT)
+      .andThen(expectArgs(Ok(theR), theT))
+      .unwrap(),
+      ).toBe(theR);
+      expect(Err(theE).andThen(notCalled).unwrapErr()).toBe(theE);
+    });
+    // @copy-test flatMap
 
   test("error", () => {
     expect(constErr(theT).error).toBe(theT);
