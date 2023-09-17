@@ -6,6 +6,13 @@ function main() {
   }
 }
 
+let tracing = false;
+function trace(...args) {
+  if (tracing) {
+    console.log(...args);
+  }
+}
+
 function matchDefinition(line, forTarget = false) {
   let m = /^ *(?:export )?(?:function|const|(type|interface)) ([a-zA-Z]+)/.exec(
     line,
@@ -40,15 +47,11 @@ function parseCopyTestDirective(line) {
 }
 
 function parseTestHeader(line) {
-  const m = /^(?: *)test\("([^"]+)",/.exec(line);
+  const m = /^((?: *))test\("([^"]+)",/.exec(line);
   if (m) {
-    return { testName: m[1] };
+    return { indent: m[1], testName: m[2] };
   }
   return undefined;
-}
-
-function trace(...args) {
-  //console.log(...args);
 }
 
 function processFile(fileName) {
@@ -67,7 +70,9 @@ function processFile(fileName) {
 
   for (const line of lines) {
     ++lineNo;
-    trace(lineNo, state, line);
+    tracing ||= line.includes("andThen");
+    tracing = true;
+    trace(lineNo, state, `"${line}"`);
 
     const die = () => {
       throw Error(
@@ -87,8 +92,11 @@ function processFile(fileName) {
     };
 
     const insertTestCopy = () => {
-      trace("inserting copy of test", inputTestName)
-    }
+      trace("inserting copy of test", inputTestName);
+      for (const line of testLines) {
+        linesOut.push(line.replace(inputTestName, outputTestName));
+      }
+    };
 
     let keepLine = true;
 
@@ -103,6 +111,7 @@ function processFile(fileName) {
         const testHeader = parseTestHeader(line);
         if (testHeader) {
           inputTestName = testHeader.testName;
+          indent = testHeader.indent;
           testLines = [line];
           state = "savingTestLines";
         }

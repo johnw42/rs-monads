@@ -178,12 +178,21 @@ describe("Result methods", () => {
   test("andThen", () => {
     expect(
       Ok(theT)
-      .andThen(expectArgs(Ok(theR), theT))
-      .unwrap(),
-      ).toBe(theR);
-      expect(Err(theE).andThen(notCalled).unwrapErr()).toBe(theE);
-    });
-    // @copy-test flatMap
+        .andThen(expectArgs(Ok(theR), theT))
+        .unwrap(),
+    ).toBe(theR);
+    expect(Err(theE).andThen(notCalled).unwrapErr()).toBe(theE);
+  });
+  
+  // @copy-test flatMap
+  test("flatMap", () => {
+    expect(
+      Ok(theT)
+        .flatMap(expectArgs(Ok(theR), theT))
+        .unwrap(),
+    ).toBe(theR);
+    expect(Err(theE).flatMap(notCalled).unwrapErr()).toBe(theE);
+  });
 
   test("error", () => {
     expect(constErr(theT).error).toBe(theT);

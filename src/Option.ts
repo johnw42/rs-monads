@@ -207,9 +207,15 @@ export const Option = {
   fromNullable,
 
   // @copy-comment
+  /**
+   * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
+   */
   ifInstanceOf,
 
   // @copy-comment
+  /**
+   * Returns `Some(value)` if `typeof value === typeName`, otherwise returns `None()`.
+   */
   ifTypeIs,
 
   // @copy-comment
