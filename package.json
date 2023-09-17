@@ -42,13 +42,11 @@
     "url": "git+https://github.com/johnw42/rs-monads.git"
   },
   "scripts": {
-    "prebuild": "yarn run copy-lines",
-    "build": "rollup -c rollup.config.js",
-    "pretest": "yarn copy-lines",
-    "test": "jest",
+    "build": "yarn run copy-lines; rollup -c rollup.config.js",
+    "test": "yarn copy-lines; jest",
     "lint": "eslint src/*.ts",
     "prepare": "husky install",
-    "copy-lines": "node copy-lines.js src/Option.ts src/Result.ts src/Identity.ts test/Option.test.ts test/Result.test.ts test/Identity.test.ts"
+    "copy-lines": "node copy-lines.js src/Option.ts src/Result.ts test/Option.test.ts test/Result.test.ts"
   },
   "sideEffects": false,
   "types": "lib",

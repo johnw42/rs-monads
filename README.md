@@ -1,11 +1,10 @@
 # rs-monads
 
 This package contains types based heavily on Rust's main monad types: `Option`
-and `Result`. It also adds methods from the popular `tap` crate and a trivial
-monad called `Identity`. Why use copy Rust APIs? Aside from familiarity to
-Rust developers, I just like the way the Rust API is designed and I find the
-method names regular enough that it's easy to remember most of them based on a
-few patterns.
+and `Result`. It also adds methods from the popular `tap` crate. Why use copy
+Rust APIs? Aside from familiarity to Rust developers, I just like the way the
+Rust API is designed and I find the method names regular enough that it's easy
+to remember most of them based on a few patterns.
 
 ## Contents
 
@@ -22,9 +21,10 @@ few patterns.
     - [Manipulating collections of monad instances](#manipulating-collections-of-monad-instances)
     - [Converting between exceptions, promises and `Result`](#converting-between-exceptions-promises-and-result)
   - [Recipes](#recipes)
-    - [Convert truthy values to `Some`](#convert-truthy-values-to-some)
+    - [Convert truthy values to `Some` and falsy values to `None`](#convert-truthy-values-to-some-and-falsy-values-to-none)
     - [Convert `NaN` values to `None`](#convert-nan-values-to-none)
     - [Convert nullish values to `Ok`, or supply an error](#convert-nullish-values-to-ok-or-supply-an-error)
+    - [Unwrap all values in an array](#unwrap-all-values-in-an-array)
   - [Alternatives](#alternatives)
     - [Uninteresting Forks](#uninteresting-forks)
 
@@ -100,11 +100,6 @@ value of type `T` and `Result.Err<T,E>` contains a value of type `E` (which typi
 represents an error). These subtypes are also aliased as `Ok<T,E>` and
 `Err<T,E>`.
 
----
-**`Identity<T>`**
-
-The trivial monad. It is simply a box that holds a value. Sometimes useful for
-sequencing function calls as if they were methods.
 
 ## Important Functions and Methods
 
@@ -120,7 +115,6 @@ instance of a monad type.
 **`Option.None()`** ★  
 **`Result.Ok(x)`** ★  
 **`Result.Err(e)`** ★  
-**`Identity(x)`**
 
 Creates an object of the specified type holding the given value.
 
@@ -168,11 +162,10 @@ equivalent to `m.unwrapOr(undefined)`.
 **`[...before, ...m, ...after]`**
 
 The monad types support the iterator protocol; `Some(x)` and `Ok(x)`, and
-`Identity` yield one item, and `None()` and `Err(e)` yield no items. This
-allows optional values to be easily spliced into arrays.
+`None()` and `Err(e)` yield no items. This allows optional values to be easily
+spliced into arrays.
 
 ---
-**Identity(x).value**  
 **Some(x).value**  
 **Ok(x).value**  
 **Err(e).error**
@@ -189,7 +182,6 @@ of `Option` and `Result`.
 **`Result.isResult(m)`** ★  
 **`Result.isOk(m)`** ★  
 **`Result.isErr(m)`** ★  
-**`Identity.isIdentity(m)`** ★
 
 Tests whether `m` is an instance of the corresponding type.
 
@@ -205,18 +197,17 @@ Tests whether `m` is an instance of the corresponding type.
 **`m.isSomeAnd(p)`**  
 **`m.isOkAnd(p)`**  
 **`m.isErrAnd(p)`**  
-**`m.isIdenityAnd(p)`**
 
 Tests whether `m` is an instance of the corresponding type whose value
 statisifes the predicate `p`.
 
 ---
 **`m1.equals(m1)`**  
-**`m1.equals(m1, cmp)`** (for `Option` and `Identity`)  
+**`m1.equals(m1, cmp)`** (for `Option`)  
 **`m1.equals(m1, cmpValues, cmpErrors)`** (for `Result`)
 
 Tests whether two instances are equal. With a single argument, monads of the
-same basic type (`Option`, `Result`, or `Identity`) are compared recursively,
+same basic type (`Option`, `Result`) are compared recursively,
 and contained values are compared with `===`.
 
 Additional arguments are binary predicates applied to the contents of the monad
@@ -226,7 +217,6 @@ fields of `Error` instances.
 
 ---
 **`Option.equals(x, y, [cmp])`**  
-**`Identity.equals(x, y, [cmp])`**  
 **`Result.equals(x, y, [cmpValues, [cmpErrors]])`**
 
 These functions are the same as the methods above, but they accept values of any
@@ -239,26 +229,24 @@ type.
 **`m.map(f)`**
 
 Analogous to `Array.map`; applies `f` to transform the the inner value of a
-`Some`, `Ok`, or `Identity` according to the following rules:
+`Some` or `Ok` according to the following rules:
 
 - `Some(x)` ↦ `Some(f(x)))`
 - `Ok()` ↦ `Ok(f(x())`
 - `None()` ↦ `None()`
 - `Err(e)` ↦ `Err(e)`
-- `Identity(x)` ↦ `Identity(f(x))`
 
 ---
 **`m.andThen(f)`**  
 **`m.flatMap(f)`**
 
 Analogous to `Array.flatMap`. These synonymous methods apply `f` to transform
-the the inner value of a `Some`, `Ok`, or `Identity` according to the following rules:
+the the inner value of a `Some` or `Ok` according to the following rules:
 
 - `Some(x)` ↦ `f(x)`
 - `Ok()` ↦ `f(x)`
 - `None()` ↦ `None()`
 - `Err(e)` ↦ `Err(e)`
-- `Identity(x)` ↦ `f(x)`
 
 ---
 **`m.mapOr(def, f)`**  
@@ -320,8 +308,8 @@ Thse function call `f()` (or `f(m.error)` for `tapErr`) if `m` has no non-error 
 ### Manipulating collections of monad instances
 
 ---
-**`Option.takeUnlessNone(seq)`** ★  
-**`Result.takeUnlessErr(seq)`** ★
+**`Option.collect(seq)`**  
+**`Result.collect(seq)`**
 
 Summarize a sequence of fallible computations, halting after the first error.
 Given an iterable sequence of monad instances, collects values of `x` in
@@ -333,7 +321,7 @@ an array of `x` values is returned, wrapped with `Some` or `Ok`.
 The following code snippets are equivalent:
 
 ```ts
-Option.takeUnlessNone(step1()).mapOrElse(() => console.log("step1 failed"), step2);
+Option.collect(step1()).mapOrElse(() => console.log("step1 failed"), step2);
 return;
 ```
 
@@ -355,11 +343,10 @@ return;
 ---
 **`Option.unwrapValues(seq)`** ★  
 **`Result.unwrapValues(seq)`** ★  
-**`Identity.unwrapValues(seq)`** ★ 
 
 These functions filter out the `None` or `Err` instances in their input sequence
 and unwrap the remaining values into a new array. The roughly equivalent to
-`Array.from(seq).flatMap(m => Array.from(m))`.
+`Array.from(seq).flatMap(Array.from)`.
 
 --- 
 **`Result.unwrapErrs(seq)`** ★
@@ -454,7 +441,7 @@ if (x !== undefined) {
 
 ## Recipes
 
-### Convert truthy values to `Some`
+### Convert truthy values to `Some` and falsy values to `None`
 
 `Some(x).filter(Boolean)`
 
@@ -465,6 +452,10 @@ if (x !== undefined) {
 ### Convert nullish values to `Ok`, or supply an error
 
 `Option.fromNullable(x).okOrElse(() => Error("expecting a value"))`
+
+### Unwrap all values in an array
+
+`[Some(x), None()].flatMap(y => [...y])`  ↦ `[x]`
 
 ## Alternatives
 

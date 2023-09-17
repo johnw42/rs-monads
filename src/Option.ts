@@ -41,6 +41,25 @@ export function Some<T>(value: T): Option<T> {
 }
 
 /**
+ * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
+ * Stops at the first `None()` and returns `None()`, otherwise returns
+ * `Some(a)`.
+ *
+ * This operation is useful in scenarios where `None()` represents failure.
+ */
+function collect<T>(options: Iterable<Option<T>>): Option<T[]> {
+  const items: T[] = [];
+  for (const option of options) {
+    if (option.isSome()) {
+      items.push(option.value);
+    } else {
+      return option.withType<T>();
+    }
+  }
+  return Some(items);
+}
+
+/**
  * Same as {@link None}, but returns a more specific type.
  */
 export function constNone<T>(): None<T> {
@@ -60,26 +79,6 @@ export function constSome<T>(value: T): Some<T> {
  */
 function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
   return nullable == null ? None() : Some(nullable);
-}
-
-/**
- * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
- */
-function ifInstanceOf<C, T>(
-  ctor: { new (...args: any[]): C },
-  value: T,
-): Option<C & T> {
-  return value instanceof ctor ? Some(value) : None();
-}
-
-/**
- * Returns `Some(value)` if `typeof value === typeName`, otherwise returns `None()`.
- */
-function ifTypeIs<T extends keyof TypeRecord>(
-  typeName: keyof TypeRecord,
-  value: unknown,
-): Option<TypeForName<T>> {
-  return (typeof value === typeName ? Some(value) : None()) as any;
 }
 
 type TypeRecord = {
@@ -115,41 +114,6 @@ export function isOption(arg: unknown): arg is Option<unknown> {
   return arg instanceof SomeImpl || arg instanceof NoneImpl;
 }
 
-/**
- * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
- * Stops at the first `None()` and returns `None()`, otherwise returns
- * `Some(a)`.
- *
- * This operation is useful in scenarios where `None()` represents failure.
- *
- * @see {@link Result.fromArray}
- */
-export function takeUnlessNone<T>(options: Iterable<Option<T>>): Option<T[]> {
-  const items: T[] = [];
-  for (const option of options) {
-    if (option.isSome()) {
-      items.push(option.value);
-    } else {
-      return option.withType<T>();
-    }
-  }
-  return Some(items);
-}
-
-/**
- * Collects `x` for every `Some(x)` in `options` into a new array which is then
- * returned.
- */
-export function unwrapSomes<T>(options: Iterable<Option<T>>): T[] {
-  const items: T[] = [];
-  for (const option of options) {
-    if (option.isSome()) {
-      items.push(option.value);
-    }
-  }
-  return items;
-}
-
 export const Option = {
   // @copy-comment
   /**
@@ -172,6 +136,16 @@ export const Option = {
    * @see {@link constNone}
    */
   None,
+
+  // @copy-comment
+  /**
+   * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
+   * Stops at the first `None()` and returns `None()`, otherwise returns
+   * `Some(a)`.
+   *
+   * This operation is useful in scenarios where `None()` represents failure.
+   */
+  collect,
 
   // @copy-comment
   /**
@@ -208,18 +182,6 @@ export const Option = {
 
   // @copy-comment
   /**
-   * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
-   */
-  ifInstanceOf,
-
-  // @copy-comment
-  /**
-   * Returns `Some(value)` if `typeof value === typeName`, otherwise returns `None()`.
-   */
-  ifTypeIs,
-
-  // @copy-comment
-  /**
    * Tests whether `arg` is an instance of `None`.
    */
   isNone,
@@ -235,32 +197,6 @@ export const Option = {
    * Tests whether `arg` is an instance of `Some`.
    */
   isSome,
-
-  // @copy-comment
-  /**
-   * Collects `x` for every `Some(x)` up to the first `None()` into an array `a`.
-   * Stops at the first `None()` and returns `None()`, otherwise returns
-   * `Some(a)`.
-   *
-   * This operation is useful in scenarios where `None()` represents failure.
-   *
-   * @see {@link Result.fromArray}
-   */
-  takeUnlessNone,
-
-  // @copy-comment
-  /**
-   * Collects `x` for every `Some(x)` in `options` into a new array which is then
-   * returned.
-   */
-  unwrapSomes,
-
-  // @copy-comment
-  /**
-   * Collects `x` for every `Some(x)` in `options` into a new array which is then
-   * returned.
-   */
-  unwrapValues: unwrapSomes,
 };
 
 export namespace Option {
@@ -280,12 +216,7 @@ export namespace Option {
 /**
  * The interface implemented by {@link Option}.
  */
-abstract class OptionBase<T> extends SingletonMonad<
-  T,
-  Some<T>,
-  never,
-  None<T>
-> {
+abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
   /**
    * If `this` is `Some(_)`, returns `other`, otherwise returns
    * `None()`.
@@ -335,14 +266,25 @@ abstract class OptionBase<T> extends SingletonMonad<
    * Return `this` if `this` is `Some(x)` and `p(x)` returns a truthy
    * value, otherwise returns `None()`.
    */
-  abstract filter(p: (value: T) => unknown): Option<T>;
+  abstract filter<P extends (value: T) => unknown>(
+    p: P,
+  ): P extends (arg: any) => arg is infer U ? Option<U> : Option<T>;
 
   /**
-   * Return `this` if `this` is `Some(x)` and `p(x)` returns a falsy
-   * value, otherwise returns `None()`.
+   * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
    */
-  filterNot(p: (value: T) => unknown): Option<T> {
-    return this.filter((x) => !p(x));
+  filterInstanceOf<C extends T>(ctor: { new(...args: any[]): C }): Option<C> {
+    return this.filter((x): x is C => x instanceof ctor);
+  }
+
+  /**
+   * Returns `Some(value)` if `typeof value === typeName`, otherwise returns `None()`.
+   */
+  filterByType<K extends keyof TypeRecord, T extends TypeRecord[K]>(
+    this: Option<unknown>,
+    typeName: K,
+  ): Option<TypeForName<K>> {
+    return this.filter((x) => typeof x === typeName) as any;
   }
 
   /**
@@ -419,14 +361,20 @@ abstract class OptionBase<T> extends SingletonMonad<
    * Alias of {@link tapNoValue}.
    */
   tapNone(f: () => void): this {
-    return this.tapNoValue(f);
+    if (this.isNone()) {
+      f();
+    }
+    return this;
   }
 
   /**
    * Alias of {@link tapValue}.
    */
   tapSome(f: (value: T) => void): this {
-    return this.tapValue(f);
+    if (this.isSome()) {
+      f(this.value);
+    }
+    return this;
   }
 
   /**
@@ -484,8 +432,10 @@ class SomeImpl<T> extends OptionBase<T> {
     return this.value;
   }
 
-  filter(p: (value: T) => unknown): Option<T> {
-    return p(this.value) ? this : None();
+  filter<P extends (value: T) => unknown>(
+    p: P,
+  ): P extends (arg: any) => arg is infer U ? Option<U> : Option<T> {
+    return p(this.value) ? (this as any) : None();
   }
 
   flatten<T>(this: Option<Option<T>>): Option<T> {
@@ -512,10 +462,6 @@ class SomeImpl<T> extends OptionBase<T> {
     f: (value: T) => R | undefined | null,
   ): Option<NonNullable<R>> {
     return Option.fromNullable(f(this.value));
-  }
-
-  mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
-    return f(this.value);
   }
 
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
@@ -580,8 +526,14 @@ class NoneImpl<T> extends OptionBase<T> {
     throw Error(typeof message === "string" ? message : message());
   }
 
-  filter(p: (value: T) => unknown): None<T> {
-    return constNone();
+  filter<P extends (value: T) => unknown>(
+    p: P,
+  ): P extends (arg: any) => arg is infer U ? None<U> : None<T> {
+    return constNone().withType();
+  }
+
+  flatMap<R>(f: (value: T) => Option<R>): None<R> {
+    return this.withType<R>();
   }
 
   flatten<T>(this: Option<Option<T>>): None<T> {
@@ -606,10 +558,6 @@ class NoneImpl<T> extends OptionBase<T> {
 
   mapNullable<R>(f: (value: T) => R): None<NonNullable<R>> {
     return constNone();
-  }
-
-  mapOr<D, R>(defaultValue: D, f: (value: T) => R): D {
-    return defaultValue;
   }
 
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): D {

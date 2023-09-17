@@ -40,6 +40,25 @@ export function Ok<T, E>(value: T): Result<T, E> {
 }
 
 /**
+ * Collects a sequence of results into a single result containing the `Ok`
+ * values. If any of the inputs is `Err(e)`, stopes immediately and returns
+ * `Err(e)`.
+ */
+function collect<T, E>(
+  results: Iterable<Result<T, E>>,
+): Result<T[], E> {
+  const items: T[] = [];
+  for (const result of results) {
+    if (result.isOk()) {
+      items.push(result.value);
+    } else {
+      return result.withType<T[]>();
+    }
+  }
+  return Ok(items);
+}
+
+/**
  * Same as {@link Err}, but returns a more specific type.
  */
 export function constErr<T, E>(error: E): Err<T, E> {
@@ -104,25 +123,6 @@ export function isResult(arg: unknown): arg is Result<unknown, unknown> {
 }
 
 /**
- * Collects a sequence of results into a single result containing the `Ok`
- * values. If any of the inputs is `Err(e)`, stopes immediately and returns
- * `Err(e)`.
- */
-export function takeUnlessErr<T, E>(
-  results: Iterable<Result<T, E>>,
-): Result<T[], E> {
-  const items: T[] = [];
-  for (const result of results) {
-    if (result.isOk()) {
-      items.push(result.value);
-    } else {
-      return result.withType<T[]>();
-    }
-  }
-  return Ok(items);
-}
-
-/**
  * Returns `Ok(x)` if `f()` returns `x`, or `Err(e)` if `f()` throws `x`.
  *
  * Its inverse is {@link Result#unwrap}.
@@ -133,53 +133,6 @@ function tryFrom<T>(f: () => T): Result<T, unknown> {
   } catch (error) {
     return Err(error);
   }
-}
-
-/**
- * Collects `e` for every `Err(e)` in `results` into a new array which is then
- * returned.
- */
-export function unwrapErrs<T, E>(results: Iterable<Result<T, E>>): E[] {
-  const errors: E[] = [];
-  for (const result of results) {
-    if (result.isErr()) {
-      errors.push(result.error);
-    }
-  }
-  return errors;
-}
-
-/**
- * Collects `x` for every `Ok(x)` in `results` into a one array and `e` from
- * every `Err(e)` into another, and returns both arrays.
- */
-export function unwrapResults<T, E>(
-  results: Iterable<Result<T, E>>,
-): [T[], E[]] {
-  const values: T[] = [];
-  const errors: E[] = [];
-  for (const result of results) {
-    if (result.isOk()) {
-      values.push(result.value);
-    } else {
-      errors.push(result.error);
-    }
-  }
-  return [values, errors];
-}
-
-/**
- * Collects `x` for every `Ok(x)` in `results` into a new array which is then
- * returned.
- */
-export function unwrapOks<T, E>(results: Iterable<Result<T, E>>): T[] {
-  const values: T[] = [];
-  for (const result of results) {
-    if (result.isOk()) {
-      values.push(result.value);
-    }
-  }
-  return values;
 }
 
 export const Result = {
@@ -238,7 +191,7 @@ export const Result = {
    * values. If any of the inputs is `Err(e)`, stopes immediately and returns
    * `Err(e)`.
    */
-  takeUnlessErr,
+  collect,
 
   // @copy-comment
   /**
@@ -257,34 +210,6 @@ export const Result = {
    * Tests wether an unknown value is an instance of `Result`.
    */
   isResult,
-
-  // @copy-comment
-  /**
-   * Collects `e` for every `Err(e)` in `results` into a new array which is then
-   * returned.
-   */
-  unwrapErrs,
-
-  // @copy-comment
-  /**
-   * Collects `x` for every `Ok(x)` in `results` into a one array and `e` from
-   * every `Err(e)` into another, and returns both arrays.
-   */
-  unwrapResults,
-
-  // @copy-comment
-  /**
-   * Collects `x` for every `Ok(x)` in `results` into a new array which is then
-   * returned.
-   */
-  unwrapOks,
-
-  // @copy-comment
-  /**
-   * Collects `x` for every `Ok(x)` in `results` into a new array which is then
-   * returned.
-   */
-  unwrapValues: unwrapOks,
 
   // @copy-comment
   /**
@@ -312,12 +237,7 @@ export namespace Result {
 /**
  * The interface implemented by {@link Result}.
  */
-export abstract class ResultBase<T, E> extends SingletonMonad<
-  T,
-  Ok<T, E>,
-  E,
-  Err<T, E>
-> {
+export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
   /**
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
    * `this`.
@@ -387,18 +307,9 @@ export abstract class ResultBase<T, E> extends SingletonMonad<
   abstract expectErr(message: string | (() => string)): E;
 
   /**
-   * Synonym for `this.isOk()`.
-   */
-  hasValue(): this is Ok<T, E> {
-    return this instanceof OkImpl;
-  }
-
-  /**
    * Tests whether `this` is `Err(e)`.
    */
-  isErr(): this is Err<T, E> {
-    return !this.hasValue();
-  }
+  abstract isErr(): this is Err<T, E>;
 
   /**
    * Tests whether `this` is an `Err(e)` for which `p(e)` is a truthy value.
@@ -408,9 +319,7 @@ export abstract class ResultBase<T, E> extends SingletonMonad<
   /**
    * Tests whether `this` is `Ok(_)`.
    */
-  isOk(): this is Ok<T, E> {
-    return this.hasValue();
-  }
+  abstract isOk(): this is Ok<T, E>;
 
   /**
    * Tests whether `this` is an `Ok(x)` for which `p(x)` is a truthy value.
@@ -420,7 +329,7 @@ export abstract class ResultBase<T, E> extends SingletonMonad<
   /**
    * An alias of `andThen`.
    */
-   flatMap<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE> {
+  flatMap<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE> {
     return this.andThen(f);
   }
 
@@ -509,9 +418,7 @@ export abstract class ResultBase<T, E> extends SingletonMonad<
   /**
    * Alias of {@link tapValue}.
    */
-  tapOk(f: (value: T) => void): this {
-    return this.tapValue(f);
-  }
+  abstract tapOk(f: (value: T) => void): this;
 
   /**
    abstract * If `this` is `Ok(x)`, returns a promise that resolves to `x`; if `this` is
@@ -606,15 +513,16 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return Option.fromNullable(f(this.value)).okOrElse(d);
   }
 
-  mapOr<D, R>(defaultValue: D, f: (value: T) => R): R {
-    return f(this.value);
-  }
-
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R {
     return f(this.value);
   }
 
   tapErr(f: (error: E) => void): this {
+    return this;
+  }
+
+  tapOk(f: (value: T) => void): this {
+    f(this.value);
     return this;
   }
 
@@ -735,10 +643,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return this as unknown as Err<R, E>;
   }
 
-  mapOr<D, R>(defaultValue: D, f: (value: T) => R): D {
-    return defaultValue;
-  }
-
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): D {
     return d(this.error);
   }
@@ -763,6 +667,10 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
 
   tapErr(f: (error: E) => void): this {
     f(this.error);
+    return this;
+  }
+
+  tapOk(f: (value: T) => void): this {
     return this;
   }
 

@@ -9,7 +9,7 @@ function main() {
 let tracing = false;
 function trace(...args) {
   if (tracing) {
-    console.log(...args);
+    // console.log(...args);
   }
 }
 
