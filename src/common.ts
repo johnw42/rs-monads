@@ -1,10 +1,3 @@
-export type ValueType<M extends SingletonMonad<unknown, any>> =
-  M extends SingletonMonad<infer T, any> ? T : never;
-
-export type ValueMonadType<M extends SingletonMonad<unknown, any>> =
-  M extends SingletonMonad<unknown, infer M> ? M : never;
-
-
 /**
  * Base class of monads whose instances contain at most one value.
  */
@@ -24,10 +17,10 @@ export abstract class SingletonMonad<
 
   /**
    * If `this` has a non-error value `x`, returns `f(x)`, otherwise returns
-   * `defaultValue`.
+   * `d`.
    */
-  mapOr<D, R>(defaultValue: D, f: (value: T) => R): D | R {
-    return this.#hasValue() ? f(this.value) : defaultValue;
+  mapOr<D, R>(d: D, f: (value: T) => R): D | R {
+    return this.#hasValue() ? f(this.value) : d;
   }
 
   /**
@@ -89,6 +82,8 @@ export abstract class SingletonMonad<
 
   /**
    * If `this` is `Ok(x)`, returns `x`, otherwise returns `undefined as T`.
+   * 
+   * WARNING: This method is note typesafe!
    */
   unwrapUnchecked(): T {
     return (this as any).value;

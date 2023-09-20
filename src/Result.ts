@@ -1,4 +1,4 @@
-import { None, Option, Some, constNone, constSome } from "./Option";
+import { None, Option, Some } from "./Option";
 import { SingletonMonad } from "./common";
 
 /**
@@ -10,12 +10,48 @@ export type Result<T, E> = Ok<T, E> | Err<T, E>;
 /**
  * The subtype of `Result<T,E>` that contains a value of type `E`.
  */
-export type Err<T, E> = ErrImpl<T, E>;
+export type Err<T, E> = Result.Err<T, E>;
 
 /**
  * The subtype of `Result<T,E>` that contains a value of type `T`.
  */
-export type Ok<T, E> = OkImpl<T, E>;
+export type Ok<T, E> = Result.Ok<T, E>;
+
+export namespace Result {
+  // @copy-comment
+  /**
+   * The subtype of `Result<T,E>` that contains a value of type `T`.
+   */
+  export type Ok<T, E> = ResultBase<T, E> & {
+    /**
+     * The value contained in this object.
+     */
+    readonly value: T;
+
+    /**
+     * Returns `this` with `E` converted to `E2`.  This operation is type-safe and
+     * always succeeds.
+     */
+    withErrType<E2>(): Result<T, E2>;
+  };
+
+  // @copy-comment
+  /**
+   * The subtype of `Result<T,E>` that contains a value of type `E`.
+   */
+  export type Err<T, E> = ResultBase<T, E> & {
+    /**
+     * The error value contained in this object.
+     */
+    readonly error: E;
+
+    /**
+     * Returns `this` with `T` converted to `T2`.  This operation is type-safe and
+     * always succeeds.
+     */
+    withType<T2>(): Err<T2, E>;
+  };
+}
 
 /**
  * Returns an instance of `Err` whose value is `error`.  The return value uses
@@ -218,20 +254,6 @@ export const Result = {
   try: tryFrom,
 };
 
-export namespace Result {
-  // @copy-comment
-  /**
-   * The subtype of `Result<T,E>` that contains a value of type `T`.
-   */
-  export type Ok<T, E> = OkImpl<T, E>;
-
-  // @copy-comment
-  /**
-   * The subtype of `Result<T,E>` that contains a value of type `E`.
-   */
-  export type Err<T, E> = ErrImpl<T, E>;
-}
-
 /**
  * The interface implemented by {@link Result}.
  */
@@ -404,6 +426,8 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
 
   /**
    * If `this` is `Err(e)`, returns `e`, otherwise returns `undefined as E`.
+   *
+   * WARNING: This method is note typesafe!
    */
   abstract unwrapErrUnchecked(): E;
 
@@ -442,12 +466,7 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
  * The implemention of the {@link Ok} type.
  */
 class OkImpl<T, E> extends ResultBase<T, E> {
-  constructor(
-    /**
-     * The value contained in this object.
-     */
-    readonly value: T,
-  ) {
+  constructor(readonly value: T) {
     super();
   }
 
@@ -514,7 +533,6 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return Option.fromNullable(f(this.value)).okOrElse(d);
   }
 
-
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D {
     return f(this.value);
   }
@@ -555,10 +573,6 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return this;
   }
 
-  /**
-   * Returns `this` with `E` converted to `E2`.  This operation is type-safe and
-   * always succeeds.
-   */
   withErrType<E2>(): Result<T, E2> {
     return this as any;
   }
@@ -580,12 +594,7 @@ class OkImpl<T, E> extends ResultBase<T, E> {
  * The implementation of the {@link Err} type.
  */
 class ErrImpl<T, E> extends ResultBase<T, E> {
-  constructor(
-    /**
-     * The error value contained in this object.
-     */
-    readonly error: E,
-  ) {
+  constructor(readonly error: E) {
     super();
   }
 
@@ -700,10 +709,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return this.error;
   }
 
-  /**
-   * Returns `this` with `T` converted to `T2`.  This operation is type-safe and
-   * always succeeds.
-   */
   withType<T2>(): Err<T2, E> {
     return this as any;
   }

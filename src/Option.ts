@@ -1,4 +1,4 @@
-import { Err, Ok, Result, constErr, constOk } from "./Result";
+import { Err, Ok, Result } from "./Result";
 import { SingletonMonad } from "./common";
 
 /**
@@ -9,12 +9,34 @@ export type Option<T> = Some<T> | None<T>;
 /**
  * The subtype of `Option<T>` that does not contain a value.
  */
-export type None<T> = NoneImpl<T>;
+export type None<T> = Option.None<T>;
 
 /**
  * The subtype of `Option<T>` that contains a value.
  */
-export type Some<T> = SomeImpl<T>;
+export type Some<T> = Option.Some<T>;
+
+export namespace Option {
+  // @copy-comment
+  /**
+   * The subtype of `Option<T>` that does not contain a value.
+   */
+  export type None<T> = OptionBase<T> & {
+    /**
+     * Returns `this` with `T` converted to `T2`.  This operation is type-safe and
+     * always succeeds.
+     */
+    withType<T2>(): Option<T2>;
+  };
+
+  // @copy-comment
+  /**
+   * The subtype of `Option<T>` that contains a value.
+   */
+  export type Some<T> = OptionBase<T> & {
+    readonly value: T;
+  };
+}
 
 /**
  * Returns an instance of `None`.
@@ -199,20 +221,6 @@ export const Option = {
   isSome,
 };
 
-export namespace Option {
-  // @copy-comment
-  /**
-   * The subtype of `Option<T>` that does not contain a value.
-   */
-  export type None<T> = NoneImpl<T>;
-
-  // @copy-comment
-  /**
-   * The subtype of `Option<T>` that contains a value.
-   */
-  export type Some<T> = SomeImpl<T>;
-}
-
 /**
  * The interface implemented by {@link Option}.
  */
@@ -320,6 +328,7 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
    */
   abstract map<R>(f: (value: T) => R): Option<R>;
 
+
   /**
    * If `this` is `Some(x)`, returns `fromNullable(f(x))`, otherwise returns
    * `None()`.
@@ -333,6 +342,11 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
    * `Some(x)`, otherwise returns `None()`.
    */
   abstract nonNullable(): Option<NonNullable<T>>;
+
+  /**
+   * If `this` is `Some(x)`, returns `f(x)`, otherwise returns `d()`.
+   */
+  abstract mapOrElse<D, R>(d: () => D, f: (value: T) => R): D | R;
 
   /**
    * If `this` is `Some(x)`, returns `Ok(x)`, otherwise returns `Err(error)`.
@@ -593,10 +607,6 @@ class NoneImpl<T> extends OptionBase<T> {
     return Ok(None());
   }
 
-  /**
-   * Returns `this` with `T` converted to `T2`.  This operation is type-safe and
-   * always succeeds.
-   */
   withType<T2>(): Option<T2> {
     return this as any;
   }
