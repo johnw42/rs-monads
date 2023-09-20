@@ -1,3 +1,4 @@
+import { Z_UNKNOWN } from "zlib";
 import {
   Err,
   None,
@@ -16,8 +17,8 @@ import {
   CallCounter,
   E,
   E2,
-  R,
   SameType,
+  R,
   T,
   expectArgs,
   notCalled,
@@ -29,8 +30,8 @@ import {
 
 describe("Result functions", () => {
   test("aliases", () => {
-    constErr(theE) satisfies SameType<Result.Err<T, E>, Err<T, E>>;
-    constOk(theT) satisfies SameType<Result.Ok<T, E>, Ok<T, E>>;
+    true satisfies SameType<Result.Err<T, E>, Err<T, E>>;
+    true satisfies SameType<Result.Ok<T, E>, Ok<T, E>>;
 
     expect(Result.Err).toBe(Err);
     expect(Result.Ok).toBe(Ok);

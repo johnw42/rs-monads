@@ -77,7 +77,7 @@ export function constSome<T>(value: T): Some<T> {
  * Returns `None()` if `nullable` is null or undefined, otherwise returns
  * `Some(x)`.
  */
-function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
+export function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
   return nullable == null ? None() : Some(nullable);
 }
 
@@ -273,7 +273,7 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
   /**
    * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
    */
-  filterInstanceOf<C extends T>(ctor: { new(...args: any[]): C }): Option<C> {
+  filterInstanceOf<C extends T>(ctor: { new (...args: any[]): C }): Option<C> {
     return this.filter((x): x is C => x instanceof ctor);
   }
 
@@ -466,13 +466,9 @@ class SomeImpl<T> extends OptionBase<T> {
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
     return f(this.value);
   }
-  
+
   nonNullable(): Option<NonNullable<T>> {
-    if (this.value == null) {
-      return None();
-    } else {
-      return this as any;
-    }
+    return this.value == null ? None() : (this as any);
   }
 
   okOr<E>(error: E): Result<T, E> {
@@ -507,9 +503,7 @@ class SomeImpl<T> extends OptionBase<T> {
   }
 
   zip<U>(other: Option<U>): Option<[T, U]> {
-    return other.isSome()
-      ? Some([this.value, other.value] as [T, U])
-      : None();
+    return other.isSome() ? Some([this.value, other.value] as [T, U]) : None();
   }
 
   zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R> {

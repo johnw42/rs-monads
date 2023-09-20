@@ -7,14 +7,15 @@ import {
   Some,
   constNone,
   constSome,
+  fromNullable,
   isNone,
   isOption,
   isSome,
 } from "../src/index";
 import {
   CallCounter,
-  R,
   SameType,
+  R,
   T,
   expectArgs,
   notCalled,
@@ -34,13 +35,14 @@ import {
 
 describe("Option functions", () => {
   test("aliases", () => {
-    constSome(theT) satisfies SameType<Option.Some<T>, Some<T>>;
-    constNone() satisfies SameType<Option.None<T>, None<T>>;
+    true satisfies SameType<Option.Some<T>, Some<T>>;
+    true satisfies SameType<Option.None<T>, None<T>>;
 
     expect(Option.Some).toBe(Some);
     expect(Option.None).toBe(None);
     expect(Option.constSome).toBe(constSome);
     expect(Option.constNone).toBe(constNone);
+    expect(Option.fromNullable).toBe(fromNullable);
     expect(Option.isOption).toBe(isOption);
     expect(Option.isSome).toBe(isSome);
     expect(Option.isNone).toBe(isNone);

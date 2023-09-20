@@ -36,4 +36,4 @@ export function expectArgs<R, A extends unknown[]>(
   return counter.expectArgs(result, ...expected);
 }
 
-export type SameType<T, U> = T extends U ? (U extends T ? T : never) : never;
+export type SameType<T, U> = T extends U ? (U extends T ? true : false) : false;
