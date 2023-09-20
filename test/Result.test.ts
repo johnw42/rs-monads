@@ -20,7 +20,6 @@ import {
   SameType,
   T,
   expectArgs,
-  expectType,
   notCalled,
   theE,
   theE2,
@@ -30,8 +29,8 @@ import {
 
 describe("Result functions", () => {
   test("aliases", () => {
-    expectType<SameType<Result.Err<T, E>, Err<T, E>>>(constErr(theE));
-    expectType<SameType<Result.Ok<T, E>, Ok<T, E>>>(constOk(theT));
+    constErr(theE) satisfies SameType<Result.Err<T, E>, Err<T, E>>;
+    constOk(theT) satisfies SameType<Result.Ok<T, E>, Ok<T, E>>;
 
     expect(Result.Err).toBe(Err);
     expect(Result.Ok).toBe(Ok);
@@ -419,11 +418,11 @@ describe("Result methods", () => {
   });
 
   test("withType", () => {
-    expectType<Result<R, E>>(constErr<T, E>(theE).withType<R>());
+    constErr<T, E>(theE).withType<R>() satisfies Result<R, E>;
   });
 
   test("withErrType", () => {
-    expectType<Result<T, E2>>(constOk<T, E>(theT).withErrType<E2>());
+    constOk<T, E>(theT).withErrType<E2>() satisfies Result<T, E2>;
   });
 });
 

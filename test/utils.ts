@@ -37,7 +37,3 @@ export function expectArgs<R, A extends unknown[]>(
 }
 
 export type SameType<T, U> = T extends U ? (U extends T ? T : never) : never;
-
-export function expectType<T>(arg: T): jest.JestMatchers<T> {
-  return expect(arg);
-}

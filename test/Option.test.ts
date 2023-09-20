@@ -17,7 +17,6 @@ import {
   SameType,
   T,
   expectArgs,
-  expectType,
   notCalled,
   theE,
   theR,
@@ -35,8 +34,8 @@ import {
 
 describe("Option functions", () => {
   test("aliases", () => {
-    expectType<SameType<Option.Some<T>, Some<T>>>(constSome(theT));
-    expectType<SameType<Option.None<T>, None<T>>>(constNone());
+    constSome(theT) satisfies SameType<Option.Some<T>, Some<T>>;
+    constNone() satisfies SameType<Option.None<T>, None<T>>;
 
     expect(Option.Some).toBe(Some);
     expect(Option.None).toBe(None);
@@ -73,11 +72,11 @@ describe("Option functions", () => {
   });
 
   test("constNone", () => {
-    expectType<None<T>>(constNone()).toEqual(None());
+    expect(constNone() satisfies None<T>).toEqual(None());
   });
 
   test("constSome", () => {
-    expectType<Some<T>>(constSome(theT)).toEqual(Some(theT));
+    expect(constSome(theT) satisfies Some<T>).toEqual(Some(theT));
   });
 
   test("equals", () => {
@@ -178,38 +177,38 @@ describe("Option methods", () => {
     expect(Some(theT).filter(expectArgs(0, theT)).isNone()).toBe(true);
     expect(None().filter(notCalled).isNone()).toBe(true);
 
-    expectType<Option<T[]>>(constNone<any>().filter(notCalled as unknown as (arg: any) => arg is T[]));
-    expectType<Option<T[]>>(constSome<any>(theT).filter(expectArgs(true, theT) as unknown as (arg: any) => arg is T[]));
+    constNone<any>().filter(notCalled as unknown as (arg: any) => arg is T[]) satisfies Option<T[]>;
+    constSome<any>(theT).filter(expectArgs(true, theT) as unknown as (arg: any) => arg is T[]) satisfies Option<T[]>;
   });
 
 
   test("filterByType", () => {
-    expectType<Option<bigint>>(Some(0).filterByType("bigint")).toEqual(None());
-    expectType<Option<boolean>>(Some(0).filterByType("boolean")).toEqual(None());
-    expectType<Option<number>>(Some("").filterByType("number")).toEqual(None());
-    expectType<Option<object>>(Some(0).filterByType("object")).toEqual(None());
-    expectType<Option<string>>(Some(0).filterByType("string")).toEqual(None());
-    expectType<Option<symbol>>(Some(0).filterByType("symbol")).toEqual(None());
-    expectType<Option<undefined>>(Some(0).filterByType("undefined")).toEqual(None());
+    expect(Some(0).filterByType("bigint") satisfies Option<bigint>).toEqual(None());
+    expect(Some(0).filterByType("boolean") satisfies Option<boolean>).toEqual(None());
+    expect(Some("").filterByType("number") satisfies Option<number>).toEqual(None());
+    expect(Some(0).filterByType("object") satisfies Option<object>).toEqual(None());
+    expect(Some(0).filterByType("string") satisfies Option<string>).toEqual(None());
+    expect(Some(0).filterByType("symbol") satisfies Option<symbol>).toEqual(None());
+    expect(Some(0).filterByType("undefined") satisfies Option<undefined>).toEqual(None());
 
     expect(Some(0n).filterByType("bigint").unwrap() === 0n).toBe(true);
-    expectType<Option<boolean>>(Some(false).filterByType("boolean")).toEqual(Some(false));
-    expectType<Option<number>>(Some(0).filterByType("number")).toEqual(Some(0));
-    expectType<Option<object>>(Some(null).filterByType("object")).toEqual(Some(null));
-    expectType<Option<string>>(Some("").filterByType("string")).toEqual(Some(""));
-    expectType<Option<symbol>>(Some(Symbol.iterator).filterByType("symbol")).toEqual(
+    expect(Some(false).filterByType("boolean") satisfies Option<boolean>).toEqual(Some(false));
+    expect(Some(0).filterByType("number") satisfies Option<number>).toEqual(Some(0));
+    expect(Some(null).filterByType("object") satisfies Option<object>).toEqual(Some(null));
+    expect(Some("").filterByType("string") satisfies Option<string>).toEqual(Some(""));
+    expect(Some(Symbol.iterator).filterByType("symbol") satisfies Option<symbol>).toEqual(
       Some(Symbol.iterator),
     );
-    expectType<Option<undefined>>(Some(undefined).filterByType("undefined")).toEqual(Some(undefined));
+    expect(Some(undefined).filterByType("undefined") satisfies Option<undefined>).toEqual(Some(undefined));
   });
 
   test("filterInstanceOf", () => {
     class A { a = 0; }
     class B extends A { b = 0; }
 
-    expectType<Option<B>>(Some<A>(new B()).filterInstanceOf(B)).toEqual(Some(new B()));
-    expectType<Option<B>>(Some<A>(new A()).filterInstanceOf(B)).toEqual(None());
-    expectType<Option<B>>(None<A>().filterInstanceOf(B)).toEqual(None());
+    expect(Some<A>(new B()).filterInstanceOf(B) satisfies Option<B>).toEqual(Some(new B()));
+    expect(Some<A>(new A()).filterInstanceOf(B) satisfies Option<B>).toEqual(None());
+    expect(None<A>().filterInstanceOf(B) satisfies Option<B>).toEqual(None());
   })
 
   test("flatten", () => {
@@ -388,7 +387,7 @@ describe("Option methods", () => {
   });
 
   test("withType", () => {
-    expectType<Option<R>>(constNone<T>().withType<R>());
+    expect(constNone<T>().withType<R>() satisfies Option<R>);
   });
 
   test("xor", () => {
