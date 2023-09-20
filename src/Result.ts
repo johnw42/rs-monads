@@ -44,9 +44,7 @@ export function Ok<T, E>(value: T): Result<T, E> {
  * values. If any of the inputs is `Err(e)`, stopes immediately and returns
  * `Err(e)`.
  */
-function collect<T, E>(
-  results: Iterable<Result<T, E>>,
-): Result<T[], E> {
+function collect<T, E>(results: Iterable<Result<T, E>>): Result<T[], E> {
   const items: T[] = [];
   for (const result of results) {
     if (result.isOk()) {
@@ -242,7 +240,7 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
    * `this`.
    */
-  abstract and<T2, E2>(other: Result<T2, E2>): Err<T, E> | Result<T2, E2>;
+  abstract and<T2, E2>(other: Result<T2, E2>): Result<T | T2, E|E2>;
 
   /**
    * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
@@ -307,26 +305,6 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
   abstract expectErr(message: string | (() => string)): E;
 
   /**
-   * Tests whether `this` is `Err(e)`.
-   */
-  abstract isErr(): this is Err<T, E>;
-
-  /**
-   * Tests whether `this` is an `Err(e)` for which `p(e)` is a truthy value.
-   */
-  abstract isErrAnd(p: (error: E) => unknown): boolean;
-
-  /**
-   * Tests whether `this` is `Ok(_)`.
-   */
-  abstract isOk(): this is Ok<T, E>;
-
-  /**
-   * Tests whether `this` is an `Ok(x)` for which `p(x)` is a truthy value.
-   */
-  abstract isOkAnd(p: (value: T) => unknown): boolean;
-
-  /**
    * An alias of `andThen`.
    */
   flatMap<R, RE>(f: (value: T) => Result<R, RE>): Result<R, E | RE> {
@@ -345,6 +323,26 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
   abstract flatten<T, E1, E2>(
     this: Result<Result<T, E1>, E2>,
   ): Result<T, E1 | E2>;
+
+  /**
+   * Tests whether `this` is `Err(e)`.
+   */
+  abstract isErr(): this is Err<T, E>;
+
+  /**
+   * Tests whether `this` is an `Err(e)` for which `p(e)` is a truthy value.
+   */
+  abstract isErrAnd(p: (error: E) => unknown): boolean;
+
+  /**
+   * Tests whether `this` is `Ok(_)`.
+   */
+  abstract isOk(): this is Ok<T, E>;
+
+  /**
+   * Tests whether `this` is an `Ok(x)` for which `p(x)` is a truthy value.
+   */
+  abstract isOkAnd(p: (value: T) => unknown): boolean;
 
   /**
    * If `this` is `Ok(x)`, returns `Ok(f(x))`, otherwise returns `this`.
@@ -375,6 +373,17 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
     f: (value: T) => R | undefined | null,
   ): Result<NonNullable<R>, D | E>;
 
+
+  /**
+   * Returns `f(x)` if `this` is `Some(x)`, otherwise returns `d`.
+   */
+  abstract mapOr<D, R>(d: D, f: (value: T) => R): R | D
+  
+  /**
+   * Returns `f(x)` if `this` is `Some(x)`, otherwise returns `d()`.
+   */
+  abstract mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R|D;
+
   /**
    * If `this` is `Ok(x)`, returns `Some(x)`, otherwise returns `None()`.
    */
@@ -384,15 +393,13 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
    * If `this` is `Ok(_)`, returns `this`, otherwise returns
    * `other`.
    */
-  abstract or<T2, E2>(other: Result<T2, E2>): Ok<T, E> | Result<T2, E2>;
+  abstract or<T2, E2>(other: Result<T2, E2>): Result<T | T2, E | E2>;
 
   /**
    * If `this` is `Ok(_)`, returns `this`, otherwise returns
    * `d(x)` where `x` is the error value of `this`.
    */
-  abstract orElse<R, RE>(
-    d: (error: E) => Result<R, RE>,
-  ): Ok<T, E> | Result<R, RE>;
+  abstract orElse<R, RE>(d: (error: E) => Result<R, RE>): Result<T | R, E | RE>;
 
   /**
    * If `this` is `Err(e)`, returns `e`, otherwise throws an error. If
@@ -458,15 +465,15 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return f(this.value);
   }
 
-  err(): None<E> {
-    return constNone();
+  err(): Option<E> {
+    return None();
   }
 
   expect(message: string | (() => string)): T {
     return this.value;
   }
 
-  expectErr(message: string | (() => string)): never {
+  expectErr(message: string | (() => string)): E {
     throw Error(typeof message === "string" ? message : message());
   }
 
@@ -475,11 +482,11 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return self.value;
   }
 
-  isErr(): false {
+  isErr(): this is Err<T,E> {
     return false;
   }
 
-  isErrAnd(p: (error: E) => unknown): false {
+  isErrAnd(p: (error: E) => unknown): boolean {
     return false;
   }
 
@@ -491,7 +498,7 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return Boolean(p(this.value));
   }
 
-  map<R>(f: (value: T) => R): Ok<R, E> {
+  map<R>(f: (value: T) => R): Result<R, E> {
     return new OkImpl(f(this.value));
   }
 
@@ -513,7 +520,11 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return Option.fromNullable(f(this.value)).okOrElse(d);
   }
 
-  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R {
+  mapOr<D, R>(d: D, f: (value: T) => R): R | D{
+    return f(this.value);
+  }
+
+  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D{
     return f(this.value);
   }
 
@@ -541,15 +552,15 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     );
   }
 
-  ok(): Some<T> {
-    return constSome(this.value);
+  ok(): Option<T> {
+    return Some(this.value);
   }
 
-  or<T2, E2>(other: Result<T2, E2>): Ok<T, E> {
+  or<T2, E2>(other: Result<T2, E2>): Result<T | T2, E | E2> {
     return this;
   }
 
-  orElse<R, RE>(d: (error: E) => Result<R, RE>): Ok<T, E> {
+  orElse<R, RE>(d: (error: E) => Result<R, RE>): Result<T | R, E | RE> {
     return this;
   }
 
@@ -557,7 +568,7 @@ class OkImpl<T, E> extends ResultBase<T, E> {
    * Returns `this` with `E` converted to `E2`.  This operation is type-safe and
    * always succeeds.
    */
-  withErrType<E2>(): Ok<T, E2> {
+  withErrType<E2>(): Result<T, E2> {
     return this as any;
   }
 
@@ -587,7 +598,7 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     super();
   }
 
-  and<T2, E2>(other: Result<T2, E2>): Err<T, E> {
+  and<T2, E2>(other: Result<T2, E2>): Result<T | T2, E | E2> {
     return this;
   }
 
@@ -595,8 +606,20 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return this.withType<R>();
   }
 
+  err(): Option<E> {
+    return Some(this.error);
+  }
+
+  expect(message: string | (() => string)): T {
+    throw Error(typeof message === "string" ? message : message());
+  }
+
+  expectErr(message: string | (() => string)): E {
+    return this.error;
+  }
+
   flatten<T, E1, E2>(this: Result<Result<T, E1>, E2>): Result<T, E1 | E2> {
-    return this as Err<T, E1 | E2>;
+    return this as any;
   }
 
   isErr(): this is Err<T, E> {
@@ -607,50 +630,28 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return Boolean(p(this.error));
   }
 
-  isOk(): false {
+  isOk(): this is Ok<T, E> {
     return false;
   }
 
-  isOkAnd(p: (value: T) => unknown): false {
+  isOkAnd(p: (value: T) => unknown): boolean {
     return false;
   }
 
-  err(): Some<E> {
-    return constSome(this.error);
-  }
 
-  expect(message: string | (() => string)): never {
-    throw Error(typeof message === "string" ? message : message());
-  }
-
-  expectErr(message: string | (() => string)): E {
-    return this.error;
-  }
-
-  ok(): None<T> {
-    return constNone();
-  }
-
-  or<T2, E2>(other: Result<T2, E2>): Result<T2, E2> {
-    return other;
-  }
-
-  orElse<R, RE>(d: (error: E) => Result<R, RE>): Result<R, RE> {
-    return d(this.error);
-  }
-
-  map<R>(f: (value: T) => R): Err<R, E> {
+  map<R>(f: (value: T) => R): Result<R, E> {
     return this as unknown as Err<R, E>;
   }
 
-  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): D {
-    return d(this.error);
+  mapErr<R>(f: (error: E) => R): Err<T, R> {
+    return new ErrImpl(f(this.error));
   }
+
 
   mapNullableOr<D, R>(
     defaultError: D,
     f: (value: T) => R | undefined | null,
-  ): Err<NonNullable<R>, D | E> {
+  ): Result<NonNullable<R>, D | E> {
     return this as any;
   }
 
@@ -661,8 +662,24 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return this as any;
   }
 
-  mapErr<R>(f: (error: E) => R): Err<T, R> {
-    return new ErrImpl(f(this.error));
+  mapOr<D, R>(d: D, f: (value: T) => R): R | D {
+    return d;
+  }
+
+  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D {
+    return d(this.error);
+  }
+
+  ok(): Option<T> {
+    return None();
+  }
+
+  or<T2, E2>(other: Result<T2, E2>): Result<T | T2, E | E2> {
+    return other;
+  }
+
+  orElse<R, RE>(d: (error: E) => Result<R, RE>): Result<T | R, E | RE> {
+    return d(this.error);
   }
 
   tapErr(f: (error: E) => void): this {
@@ -686,7 +703,7 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return Some(Err(this.unwrapErrUnchecked()));
   }
 
-  unwrap(errorFactory?: () => unknown): never {
+  unwrap(errorFactory?: () => unknown): T {
     throw errorFactory ? errorFactory() : this.error;
   }
 

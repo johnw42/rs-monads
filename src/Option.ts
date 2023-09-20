@@ -53,7 +53,7 @@ function collect<T>(options: Iterable<Option<T>>): Option<T[]> {
     if (option.isSome()) {
       items.push(option.value);
     } else {
-      return option.withType<T>();
+      return option.withType();
     }
   }
   return Some(items);
@@ -300,13 +300,6 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
   abstract flatten<T>(this: Option<Option<T>>): Option<T>;
 
   /**
-   * Synonym for `this.isSome()`.
-   */
-  hasValue(): this is Some<T> {
-    return this.isSome();
-  }
-
-  /**
    * Tests whether `this` is `None()`.
    */
   abstract isNone(): this is None<T>;
@@ -336,6 +329,12 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
   ): Option<NonNullable<R>>;
 
   /**
+   * If `this` is `Some(x)` where `x` is not `null` or `undefined`, returns
+   * `Some(x)`, otherwise returns `None()`.
+   */
+  abstract nonNullable(): Option<NonNullable<T>>;
+
+  /**
    * If `this` is `Some(x)`, returns `Ok(x)`, otherwise returns `Err(error)`.
    */
   abstract okOr<E>(error: E): Result<T, E>;
@@ -349,13 +348,13 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
    * If `this` is `Some(_)`, returns `this`, otherwise returns
    * `other`.
    */
-  abstract or<U>(other: Option<U>): Option<T> | Option<U>;
+  abstract or<U>(other: Option<U>): Option<T | U>;
 
   /**
    * If `this` is `Some(_)`, returns `this`, otherwise returns
    * `d()`.
    */
-  abstract orElse<R>(d: () => Option<R>): Option<T> | Option<R>;
+  abstract orElse<R>(d: () => Option<R>): Option<T | R>;
 
   /**
    * Alias of {@link tapNoValue}.
@@ -392,7 +391,7 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
    abstract * If both or neither of `this` and `other` contain a value, returns `None()`;
    * otherwise returns whitchever of `this` or `other` is `Some(_)`.
    */
-  abstract xor<U>(other: Option<U>): Option<T> | Option<U>;
+  abstract xor<U>(other: Option<U>): Option<T | U>;
 
   /**
    * If `this` is `Some(x)` and `other` is `Some(y)`, returns
@@ -442,7 +441,7 @@ class SomeImpl<T> extends OptionBase<T> {
     return this.unwrapUnchecked();
   }
 
-  isNone(): false {
+  isNone(): this is None<T> {
     return false;
   }
 
@@ -467,20 +466,28 @@ class SomeImpl<T> extends OptionBase<T> {
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
     return f(this.value);
   }
-
-  okOr<E>(error: E): Ok<T, E> {
-    return constOk(this.value);
+  
+  nonNullable(): Option<NonNullable<T>> {
+    if (this.value == null) {
+      return None();
+    } else {
+      return this as any;
+    }
   }
 
-  okOrElse<E>(error: () => E): Ok<T, E> {
-    return constOk(this.value);
+  okOr<E>(error: E): Result<T, E> {
+    return Ok(this.value);
   }
 
-  or<U>(other: Option<U>): Some<T> {
+  okOrElse<E>(error: () => E): Result<T, E> {
+    return Ok(this.value);
+  }
+
+  or<U>(other: Option<U>): Option<T> {
     return this;
   }
 
-  orElse<R>(f: (value: T) => Option<R>): Some<T> {
+  orElse<R>(f: (value: T) => Option<R>): Option<T | R> {
     return this;
   }
 
@@ -491,22 +498,22 @@ class SomeImpl<T> extends OptionBase<T> {
   transpose<T, E>(this: Option<Result<T, E>>): Result<Option<T>, E> {
     return this.unwrapUnchecked().mapOrElse(
       (error: E) => Err(error),
-      (value: T) => Ok(constSome(value)),
+      (value: T) => Ok(Some(value)),
     );
   }
 
-  xor<U>(other: Option<U>): Option<T> | None<U> {
-    return other.isNone() ? this : constNone<U>();
+  xor<U>(other: Option<U>): Option<T | U> {
+    return other.isNone() ? this : None<U>();
   }
 
   zip<U>(other: Option<U>): Option<[T, U]> {
     return other.isSome()
-      ? new SomeImpl([this.value, other.value] as [T, U])
+      ? Some([this.value, other.value] as [T, U])
       : None();
   }
 
   zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R> {
-    return other.isSome() ? new SomeImpl(f(this.value, other.value)) : None();
+    return other.isSome() ? Some(f(this.value, other.value)) : None();
   }
 }
 
@@ -514,62 +521,66 @@ class SomeImpl<T> extends OptionBase<T> {
  * The implemention values returned by {@link None}.
  */
 class NoneImpl<T> extends OptionBase<T> {
-  and<U>(other: Option<U>): None<U> {
-    return constNone();
+  and<U>(other: Option<U>): Option<U> {
+    return None();
   }
 
-  andThen<R>(f: (value: T) => Option<R>): None<R> {
-    return constNone();
+  andThen<R>(f: (value: T) => Option<R>): Option<R> {
+    return None();
   }
 
-  expect(message: string | (() => string)): never {
+  expect(message: string | (() => string)): T {
     throw Error(typeof message === "string" ? message : message());
   }
 
   filter<P extends (value: T) => unknown>(
     p: P,
-  ): P extends (arg: any) => arg is infer U ? None<U> : None<T> {
-    return constNone().withType();
+  ): P extends (arg: any) => arg is infer U ? Option<U> : Option<T> {
+    return None() as any;
   }
 
-  flatMap<R>(f: (value: T) => Option<R>): None<R> {
-    return this.withType<R>();
+  flatMap<R>(f: (value: T) => Option<R>): Option<R> {
+    return this.withType();
   }
 
-  flatten<T>(this: Option<Option<T>>): None<T> {
-    return constNone();
+  flatten<T>(this: Option<Option<T>>): Option<T> {
+    return None();
   }
 
-  isSome(): false {
+  isSome(): this is Some<T> {
     return false;
   }
 
-  isSomeAnd(p: (value: T) => unknown): false {
+  isSomeAnd(p: (value: T) => unknown): boolean {
     return false;
   }
 
-  isNone(): true {
+  isNone(): this is None<T> {
     return true;
   }
 
-  map<R>(f: (value: T) => R): None<R> {
-    return constNone();
+  map<R>(f: (value: T) => R): Option<R> {
+    return None();
   }
 
-  mapNullable<R>(f: (value: T) => R): None<NonNullable<R>> {
-    return constNone();
+  mapNullable<R>(f: (value: T) => R): Option<NonNullable<R>> {
+    return None();
   }
 
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): D {
     return d();
   }
 
-  okOr<E>(error: E): Err<T, E> {
-    return constErr(error);
+  nonNullable(): Option<NonNullable<T>> {
+    return this.withType();
   }
 
-  okOrElse<E>(error: () => E): Err<T, E> {
-    return constErr(error());
+  okOr<E>(error: E): Result<T, E> {
+    return Err(error);
+  }
+
+  okOrElse<E>(error: () => E): Result<T, E> {
+    return Err(error());
   }
 
   or<U>(other: Option<U>): Option<U> {
@@ -592,20 +603,20 @@ class NoneImpl<T> extends OptionBase<T> {
    * Returns `this` with `T` converted to `T2`.  This operation is type-safe and
    * always succeeds.
    */
-  withType<T2>() {
+  withType<T2>(): Option<T2> {
     return this as any;
   }
 
-  xor<U>(other: Option<U>): Option<T> | Option<U> {
+  xor<U>(other: Option<U>): Option<T | U> {
     return other.isSome() ? other : this;
   }
 
-  zip<U>(other: Option<U>): None<[T, U]> {
-    return constNone();
+  zip<U>(other: Option<U>): Option<[T, U]> {
+    return None();
   }
 
-  zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): None<R> {
-    return constNone();
+  zipWith<U, R>(other: Option<U>, f: (a: T, b: U) => R): Option<R> {
+    return None();
   }
 }
 

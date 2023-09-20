@@ -142,9 +142,6 @@ describe("Option methods", () => {
     expect(Some(theT).andThen(expectArgs(None(), theT)).isNone()).toBe(true);
     expect(Some(theT).andThen(expectArgs(None(), theT)).isNone()).toBe(true);
     expect(None().andThen(notCalled).isNone()).toBe(true);
-
-    expectType<Option<T>>(constSome(theT).andThen(() => Some(theT)));
-    expectType<None<T>>(constNone().andThen(() => constSome(theT)));
   });
 
   // @copy-test flatMap
@@ -157,9 +154,6 @@ describe("Option methods", () => {
     expect(Some(theT).flatMap(expectArgs(None(), theT)).isNone()).toBe(true);
     expect(Some(theT).flatMap(expectArgs(None(), theT)).isNone()).toBe(true);
     expect(None().flatMap(notCalled).isNone()).toBe(true);
-
-    expectType<Option<T>>(constSome(theT).flatMap(() => Some(theT)));
-    expectType<None<T>>(constNone().flatMap(() => constSome(theT)));
   });
 
   test("equals", () => {
@@ -184,8 +178,6 @@ describe("Option methods", () => {
     expect(Some(theT).filter(expectArgs(0, theT)).isNone()).toBe(true);
     expect(None().filter(notCalled).isNone()).toBe(true);
 
-    expectType<None<T>>(constNone<T>().filter(notCalled));
-    expectType<Option<T[]>>(None<any>().filter(notCalled as unknown as (arg: any) => arg is T[]));
     expectType<Option<T[]>>(constNone<any>().filter(notCalled as unknown as (arg: any) => arg is T[]));
     expectType<Option<T[]>>(constSome<any>(theT).filter(expectArgs(true, theT) as unknown as (arg: any) => arg is T[]));
   });
@@ -224,11 +216,6 @@ describe("Option methods", () => {
     expect(Some(Some(theT)).flatten().unwrap()).toBe(theT);
     expect(Some(None()).flatten().isNone()).toBe(true);
     expect(None<Option<T>>().flatten().isNone()).toBe(true);
-  });
-
-  test("hasValue", () => {
-    expect(Some(0).hasValue()).toBe(true);
-    expect(None().hasValue()).toBe(false);
   });
 
   test("isNone", () => {
@@ -280,6 +267,13 @@ describe("Option methods", () => {
   test("mapOrUndef", () => {
     expect(Some(theT).mapOrUndef(expectArgs(theR, theT))).toBe(theR);
     expect(None().mapOrUndef(notCalled)).toBe(undefined);
+  });
+
+  test("nonNullable", () => {
+    expect(Some(theT).nonNullable()).toEqual(Some(theT));
+    expect(Some(null).nonNullable()).toEqual(None());
+    expect(Some(undefined).nonNullable()).toEqual(None());
+    expect(None().nonNullable()).toEqual(None());
   });
 
   test("okOr", () => {
@@ -394,7 +388,7 @@ describe("Option methods", () => {
   });
 
   test("withType", () => {
-    expectType<None<R>>(constNone<T>().withType<R>());
+    expectType<Option<R>>(constNone<T>().withType<R>());
   });
 
   test("xor", () => {
