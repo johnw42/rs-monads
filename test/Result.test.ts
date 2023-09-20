@@ -1,4 +1,3 @@
-import { Z_UNKNOWN } from "zlib";
 import {
   Err,
   None,

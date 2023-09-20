@@ -240,7 +240,7 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
    * `this`.
    */
-  abstract and<T2, E2>(other: Result<T2, E2>): Result<T | T2, E|E2>;
+  abstract and<T2, E2>(other: Result<T2, E2>): Result<T | T2, E | E2>;
 
   /**
    * If `this` is `Ok(x)`, returns `f(x)`, otherwise returns
@@ -373,16 +373,10 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
     f: (value: T) => R | undefined | null,
   ): Result<NonNullable<R>, D | E>;
 
-
-  /**
-   * Returns `f(x)` if `this` is `Some(x)`, otherwise returns `d`.
-   */
-  abstract mapOr<D, R>(d: D, f: (value: T) => R): R | D
-  
   /**
    * Returns `f(x)` if `this` is `Some(x)`, otherwise returns `d()`.
    */
-  abstract mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R|D;
+  abstract mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D;
 
   /**
    * If `this` is `Ok(x)`, returns `Some(x)`, otherwise returns `None()`.
@@ -482,7 +476,7 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return self.value;
   }
 
-  isErr(): this is Err<T,E> {
+  isErr(): this is Err<T, E> {
     return false;
   }
 
@@ -520,11 +514,8 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return Option.fromNullable(f(this.value)).okOrElse(d);
   }
 
-  mapOr<D, R>(d: D, f: (value: T) => R): R | D{
-    return f(this.value);
-  }
 
-  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D{
+  mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D {
     return f(this.value);
   }
 
@@ -638,7 +629,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return false;
   }
 
-
   map<R>(f: (value: T) => R): Result<R, E> {
     return this as unknown as Err<R, E>;
   }
@@ -646,7 +636,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
   mapErr<R>(f: (error: E) => R): Err<T, R> {
     return new ErrImpl(f(this.error));
   }
-
 
   mapNullableOr<D, R>(
     defaultError: D,
@@ -660,10 +649,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     f: (value: T) => R | undefined | null,
   ): Err<NonNullable<R>, D | E> {
     return this as any;
-  }
-
-  mapOr<D, R>(d: D, f: (value: T) => R): R | D {
-    return d;
   }
 
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D {
