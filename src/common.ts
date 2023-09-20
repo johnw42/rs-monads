@@ -1,18 +1,28 @@
 /**
  * Base class of monads whose instances contain at most one value.
  */
-export abstract class SingletonMonad<
-  T,
-  MT extends { readonly value: T } & SingletonMonad<T, MT>,
-> implements Iterable<T>
-{
+export abstract class SingletonMonad<T> implements Iterable<T> {
   [Symbol.iterator](): Iterator<T> {
     return (this.#hasValue() ? [this.value] : []).values();
   }
 
   // Returns true iff `this` has a `value` field.
-  #hasValue(): this is MT {
+  #hasValue(): this is this & { value: T } {
     return "value" in this;
+  }
+
+  /**
+   * If `this` is has a value returns `this.x`, otherwise throws `Error(message)` or
+   * `Error(message())`.
+   *
+   * For the sake of clarity, the message should typically contain the word
+   * "should".
+   */
+  expect(message: string | (() => string)): T {
+    if (this.#hasValue()) {
+      return this.value;
+    }
+    throw Error(typeof message === "string" ? message : message());
   }
 
   /**
@@ -55,6 +65,8 @@ export abstract class SingletonMonad<
     return this.unwrapOrUndef();
   }
 
+  abstract toString(): string;
+
   /**
    * Returns the value contained in this instance, or throws an exception if
    * there is no value.  If given, `lazyError` is called to create the error.
@@ -82,7 +94,7 @@ export abstract class SingletonMonad<
 
   /**
    * If `this` is `Ok(x)`, returns `x`, otherwise returns `undefined as T`.
-   * 
+   *
    * WARNING: This method is note typesafe!
    */
   unwrapUnchecked(): T {

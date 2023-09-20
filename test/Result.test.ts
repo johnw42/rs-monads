@@ -118,7 +118,7 @@ describe("Result functions", () => {
   });
 
   test("try", () => {
-    expect(Result.try(() => theT).unwrap()).toBe(theT);
+    expect(Result.try(() => theT)).toEqual(Ok(theT));
     expect(
       Result.try(() => {
         throw theT;
@@ -134,10 +134,10 @@ describe("Result methods", () => {
   });
 
   test("and", () => {
-    expect(Ok(theT).and(Ok(theE)).unwrap()).toBe(theE);
-    expect(Ok(theT).and(Err(theE)).unwrapErr()).toBe(theE);
-    expect(Err(theT).and(Ok(theE)).unwrapErr()).toBe(theT);
-    expect(Err(theT).and(Err(theE)).unwrapErr()).toBe(theT);
+    expect(Ok(theT).and(Ok(theE))).toEqual(Ok(theE));
+    expect(Ok(theT).and(Err(theE))).toEqual(Err(theE));
+    expect(Err(theT).and(Ok(theE))).toEqual(Err(theT));
+    expect(Err(theT).and(Err(theE))).toEqual(Err(theT));
   });
 
   test("andThen", () => {
@@ -146,7 +146,7 @@ describe("Result methods", () => {
         .andThen(expectArgs(Ok(theR), theT))
         .unwrap(),
     ).toBe(theR);
-    expect(Err(theE).andThen(notCalled).unwrapErr()).toBe(theE);
+    expect(Err(theE).andThen(notCalled)).toEqual(Err(theE));
   });
 
   // @copy-test flatMap
@@ -156,7 +156,7 @@ describe("Result methods", () => {
         .flatMap(expectArgs(Ok(theR), theT))
         .unwrap(),
     ).toBe(theR);
-    expect(Err(theE).flatMap(notCalled).unwrapErr()).toBe(theE);
+    expect(Err(theE).flatMap(notCalled)).toEqual(Err(theE));
   });
 
   test("error", () => {
@@ -208,8 +208,8 @@ describe("Result methods", () => {
   });
 
   test("err", () => {
-    expect(Ok(theT).err().isNone()).toBe(true);
-    expect(Err(theT).err().unwrap()).toBe(theT);
+    expect(Ok(theT).err()).toEqual(None());
+    expect(Err(theE).err()).toEqual(Some(theE));
   });
 
   test("flatten", () => {
@@ -227,11 +227,11 @@ describe("Result methods", () => {
         })
         .unwrap(),
     ).toBe(theE);
-    expect(Err(theT).map(notCalled).unwrapErr()).toBe(theT);
+    expect(Err(theT).map(notCalled)).toEqual(Err(theT));
   });
 
   test("mapErr", () => {
-    expect(Ok(theT).mapErr(notCalled).unwrap()).toBe(theT);
+    expect(Ok(theT).mapErr(notCalled)).toEqual(Ok(theT));
     expect(
       Err(theT)
         .mapErr((value) => {
@@ -240,44 +240,6 @@ describe("Result methods", () => {
         })
         .unwrapErr(),
     ).toBe(theE);
-  });
-
-  test("mapNullableOr", () => {
-    const defaultE = {};
-    expect(
-      Ok(theT).mapNullableOr(defaultE, expectArgs(theR, theT)).unwrap(),
-    ).toBe(theR);
-    expect(
-      Ok(theT)
-        .mapNullableOr(defaultE, () => null)
-        .unwrapErr(),
-    ).toBe(defaultE);
-    expect(
-      Ok(theT)
-        .mapNullableOr(defaultE, () => undefined)
-        .unwrapErr(),
-    ).toBe(defaultE);
-    expect(Err(theE).mapNullableOr(defaultE, notCalled).unwrapErr()).toBe(theE);
-  });
-
-  test("mapNullableOrElse", () => {
-    const defaultE = {};
-    expect(
-      Ok(theT).mapNullableOrElse(notCalled, expectArgs(theR, theT)).unwrap(),
-    ).toBe(theR);
-    expect(
-      Ok(theT)
-        .mapNullableOrElse(expectArgs(defaultE), () => null)
-        .unwrapErr(),
-    ).toBe(defaultE);
-    expect(
-      Ok(theT)
-        .mapNullableOrElse(expectArgs(defaultE), () => undefined)
-        .unwrapErr(),
-    ).toBe(defaultE);
-    expect(Err(theE).mapNullableOrElse(notCalled, notCalled).unwrapErr()).toBe(
-      theE,
-    );
   });
 
   test("mapOr", () => {
@@ -300,20 +262,34 @@ describe("Result methods", () => {
     expect(Err(theE).mapOrUndef(notCalled)).toBe(undefined);
   });
 
+  test("nonNullableOr", () => {
+    expect(Ok(theT).nonNullableOr(theE)).toEqual(Ok(theT));
+    expect(Ok(null).nonNullableOr(theE)).toEqual(Err(theE));
+    expect(Ok(undefined).nonNullableOr(theE)).toEqual(Err(theE));
+    expect(Err(theE).nonNullableOr(theE2)).toEqual(Err(theE));
+  });
+
+  test("nonNullableOrElse", () => {
+    expect(Ok(theT).nonNullableOrElse(expectArgs(theE))).toEqual(Ok(theT));
+    expect(Ok(null).nonNullableOrElse(expectArgs(theE))).toEqual(Err(theE));
+    expect(Ok(undefined).nonNullableOrElse(expectArgs(theE))).toEqual(Err(theE));
+    expect(Err(theE).nonNullableOrElse(expectArgs(theE2))).toEqual(Err(theE));
+  });
+
   test("ok", () => {
-    expect(Ok(theT).ok().unwrap()).toBe(theT);
-    expect(Err(theT).ok().isNone()).toBe(true);
+    expect(Ok(theT).ok()).toEqual(Some(theT));
+    expect(Err(theT).ok()).toEqual(None());
   });
 
   test("or", () => {
-    expect(Ok(theT).or(Ok(theE)).unwrap()).toBe(theT);
-    expect(Ok(theT).or(Err(theE)).unwrap()).toBe(theT);
-    expect(Err(theT).or(Ok(theE)).unwrap()).toBe(theE);
-    expect(Err(theT).or(Err(theE)).unwrapErr()).toBe(theE);
+    expect(Ok(theT).or(Ok(theE))).toEqual(Ok(theT));
+    expect(Ok(theT).or(Err(theE))).toEqual(Ok(theT));
+    expect(Err(theT).or(Ok(theE))).toEqual(Ok(theE));
+    expect(Err(theT).or(Err(theE))).toEqual(Err(theE));
   });
 
   test("orElse", () => {
-    expect(Ok(theT).orElse(notCalled).unwrap()).toBe(theT);
+    expect(Ok(theT).orElse(notCalled)).toEqual(Ok(theT));
     expect(
       Err(theT)
         .orElse(() => Ok(theE))
@@ -327,7 +303,7 @@ describe("Result methods", () => {
   });
 
   test("unwrap", () => {
-    expect(Ok(theT).unwrap()).toBe(theT);
+    expect(Ok(theT)).toEqual(Ok(theT));
     expect(Ok(theT).unwrap(notCalled)).toBe(theT);
     expect(() => Err(Error("xyzzy")).unwrap()).toThrow("xyzzy");
     expect(() => Err(theE).unwrap(() => Error("xyzzy"))).toThrow(
@@ -338,7 +314,7 @@ describe("Result methods", () => {
   test("unwrapErr", () => {
     expect(() => Ok(theT).unwrapErr()).toThrow(Error);
     expect(() => Ok(theT).unwrapErr(() => new Error("xyzzy"))).toThrow("xyzzy");
-    expect(Err(theT).unwrapErr()).toBe(theT);
+    expect(Err(theT)).toEqual(Err(theT));
     expect(Err(theT).unwrapErr(notCalled)).toBe(theT);
   });
 
@@ -404,9 +380,9 @@ describe("Result methods", () => {
   });
 
   test("transpose", () => {
-    expect(Ok(Some(theT)).transpose().unwrap().unwrap()).toBe(theT);
+    expect(Ok(Some(theT)).transpose().unwrap()).toEqual(Ok(theT));
     expect(Ok(None()).transpose().isNone()).toBe(true);
-    expect(Err<Option<T>, E>(theE).transpose().unwrap().unwrapErr()).toBe(theE);
+    expect(Err<Option<T>, E>(theE).transpose().unwrap()).toEqual(Err(theE));
   });
 
   test("value", () => {

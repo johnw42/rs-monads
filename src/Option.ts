@@ -96,11 +96,11 @@ export function constSome<T>(value: T): Some<T> {
 }
 
 /**
- * Returns `None()` if `nullable` is null or undefined, otherwise returns
+ * Returns `None()` if `x` is null or undefined, otherwise returns
  * `Some(x)`.
  */
-export function fromNullable<T>(nullable: T): Option<NonNullable<T>> {
-  return nullable == null ? None() : Some(nullable);
+export function fromNullable<T>(x: T): Option<NonNullable<T>> {
+  return x == null ? None() : Some(x);
 }
 
 type TypeRecord = {
@@ -197,7 +197,7 @@ export const Option = {
 
   // @copy-comment
   /**
-   * Returns `None()` if `nullable` is null or undefined, otherwise returns
+   * Returns `None()` if `x` is null or undefined, otherwise returns
    * `Some(x)`.
    */
   fromNullable,
@@ -224,7 +224,7 @@ export const Option = {
 /**
  * The interface implemented by {@link Option}.
  */
-abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
+abstract class OptionBase<T> extends SingletonMonad<T> {
   /**
    * If `this` is `Some(_)`, returns `other`, otherwise returns
    * `None()`.
@@ -281,14 +281,14 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
   /**
    * Returns `Some(value)` if `Boolean(value)`, otherwise returns `None()`.
    */
-  filterInstanceOf<C extends T>(ctor: { new (...args: any[]): C }): Option<C> {
+  filterClass<C extends T>(ctor: { new(...args: any[]): C }): Option<C> {
     return this.filter((x): x is C => x instanceof ctor);
   }
 
   /**
    * Returns `Some(value)` if `typeof value === typeName`, otherwise returns `None()`.
    */
-  filterByType<K extends keyof TypeRecord, T extends TypeRecord[K]>(
+  filterType<K extends keyof TypeRecord, T extends TypeRecord[K]>(
     this: Option<unknown>,
     typeName: K,
   ): Option<TypeForName<K>> {
@@ -327,15 +327,6 @@ abstract class OptionBase<T> extends SingletonMonad<T, Some<T>> {
    * `None()`.
    */
   abstract map<R>(f: (value: T) => R): Option<R>;
-
-
-  /**
-   * If `this` is `Some(x)`, returns `fromNullable(f(x))`, otherwise returns
-   * `None()`.
-   */
-  abstract mapNullable<R>(
-    f: (value: T) => R | undefined | null,
-  ): Option<NonNullable<R>>;
 
   /**
    * If `this` is `Some(x)` where `x` is not `null` or `undefined`, returns
@@ -471,12 +462,6 @@ class SomeImpl<T> extends OptionBase<T> {
     return Some(f(this.value));
   }
 
-  mapNullable<R>(
-    f: (value: T) => R | undefined | null,
-  ): Option<NonNullable<R>> {
-    return Option.fromNullable(f(this.value));
-  }
-
   mapOrElse<D, R>(d: () => D, f: (value: T) => R): R {
     return f(this.value);
   }
@@ -568,10 +553,6 @@ class NoneImpl<T> extends OptionBase<T> {
   }
 
   map<R>(f: (value: T) => R): Option<R> {
-    return None();
-  }
-
-  mapNullable<R>(f: (value: T) => R): Option<NonNullable<R>> {
     return None();
   }
 

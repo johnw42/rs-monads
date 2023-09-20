@@ -121,6 +121,12 @@ function equals(
   return isResult(a) && isResult(b) && a.equals(b, okCmp, errCmp);
 }
 
+// Not implemented: `fromNullableOr(d, x)`
+// Use `Option.fromNullable(x).okOr(d)`
+
+// Not implemented: `fromNullableOrElse(d, x)`
+// Use `Option.fromNullable(x).okOrElse(d)`
+
 /**
  * Converts a promise that resolves to `x` into a promise that resolves to
  * `Ok(x)`, and converts a promise that rejects with `e` to a promise that
@@ -257,7 +263,7 @@ export const Result = {
 /**
  * The interface implemented by {@link Result}.
  */
-export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
+export abstract class ResultBase<T, E> extends SingletonMonad<T> {
   /**
    * If `this` is `Ok(_)`, returns `other`, otherwise returns
    * `this`.
@@ -307,15 +313,6 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
    * If `this` is `Err(e)`, returns `Some(e)`, otherwise returns `None()`.
    */
   abstract err(): Option<E>;
-
-  /**
-   * If `this` is `Ok(x)`, returns `x`, otherwise throws `Error(message)` or
-   * `Error(message())`.
-   *
-   * For the sake of clarity, the message should typically contain the word
-   * "should".
-   */
-  abstract expect(message: string | (() => string)): T;
 
   /**
    * If `this` is `Err(e)`, returns `e`, otherwise throws `Error(message)`
@@ -378,27 +375,25 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
   abstract mapErr<R>(f: (error: E) => R): Result<T, R>;
 
   /**
-   * If `this` is `Ok(x)`, returns `fromNullableOr(f(x))`, otherwise returns
-   * `Err(error)`.
-   */
-  abstract mapNullableOr<D, R>(
-    defaultError: D,
-    f: (value: T) => R | undefined | null,
-  ): Result<NonNullable<R>, D | E>;
-
-  /**
-   * If `this` is `Ok(x)`, returns `fromNullableOrElse(d, f(x))`, otherwise returns
-   * `Err(error)`.
-   */
-  abstract mapNullableOrElse<D, R>(
-    d: () => D,
-    f: (value: T) => R | undefined | null,
-  ): Result<NonNullable<R>, D | E>;
-
-  /**
    * Returns `f(x)` if `this` is `Some(x)`, otherwise returns `d()`.
    */
   abstract mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D;
+
+  /**
+   * If `this` is `Ok(x)`, returns `fromNullableOr(d, x)`, otherwise returns
+   * `this`.
+   *
+   * @see {@link Result.fromNullableOr}
+   */
+  abstract nonNullableOr<D>(d: D): Result<NonNullable<T>, D | E>;
+
+  /**
+   * If `this` is `Ok(x)`, returns `fromNullableOrElse(d, x)`, otherwise returns
+   * `this`.
+   *
+   * @see {@link fromNullableOrElse}
+   */
+  abstract nonNullableOrElse<D>(d: () => D): Result<NonNullable<T>, D | E>;
 
   /**
    * If `this` is `Ok(x)`, returns `Some(x)`, otherwise returns `None()`.
@@ -416,6 +411,9 @@ export abstract class ResultBase<T, E> extends SingletonMonad<T, Ok<T, E>> {
    * `d(x)` where `x` is the error value of `this`.
    */
   abstract orElse<R, RE>(d: (error: E) => Result<R, RE>): Result<T | R, E | RE>;
+
+  // Not implemented it doesn't sense: any variation of `r.toNullable()`.
+  // Use `r.ok().toNullable()`
 
   /**
    * If `this` is `Err(e)`, returns `e`, otherwise throws an error. If
@@ -482,10 +480,6 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return None();
   }
 
-  expect(message: string | (() => string)): T {
-    return this.value;
-  }
-
   expectErr(message: string | (() => string)): E {
     throw Error(typeof message === "string" ? message : message());
   }
@@ -519,22 +513,16 @@ class OkImpl<T, E> extends ResultBase<T, E> {
     return this as unknown as Ok<T, R>;
   }
 
-  mapNullableOr<D, R>(
-    defaultError: D,
-    f: (value: T) => R | undefined | null,
-  ): Result<NonNullable<R>, D | E> {
-    return Option.fromNullable(f(this.value)).okOr(defaultError);
-  }
-
-  mapNullableOrElse<D, R>(
-    d: () => D,
-    f: (value: T) => R | undefined | null,
-  ): Result<NonNullable<R>, D | E> {
-    return Option.fromNullable(f(this.value)).okOrElse(d);
-  }
-
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D {
     return f(this.value);
+  }
+
+  nonNullableOr<D>(d: D): Result<NonNullable<T>, D | E> {
+    return this.value == null ? Err(d) : (this as any);
+  }
+
+  nonNullableOrElse<D>(d: () => D): Result<NonNullable<T>, D | E> {
+    return this.value == null ? Err(d()) : (this as any);
   }
 
   tapErr(f: (error: E) => void): this {
@@ -610,10 +598,6 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return Some(this.error);
   }
 
-  expect(message: string | (() => string)): T {
-    throw Error(typeof message === "string" ? message : message());
-  }
-
   expectErr(message: string | (() => string)): E {
     return this.error;
   }
@@ -638,26 +622,20 @@ class ErrImpl<T, E> extends ResultBase<T, E> {
     return false;
   }
 
+  nonNullableOr<D>(defaultError: D): Result<NonNullable<T>, D | E> {
+    return this as any;
+  }
+
+  nonNullableOrElse<D>(d: () => D): Err<NonNullable<T>, D | E> {
+    return this as any;
+  }
+
   map<R>(f: (value: T) => R): Result<R, E> {
     return this as unknown as Err<R, E>;
   }
 
   mapErr<R>(f: (error: E) => R): Err<T, R> {
     return new ErrImpl(f(this.error));
-  }
-
-  mapNullableOr<D, R>(
-    defaultError: D,
-    f: (value: T) => R | undefined | null,
-  ): Result<NonNullable<R>, D | E> {
-    return this as any;
-  }
-
-  mapNullableOrElse<D, R>(
-    d: () => D,
-    f: (value: T) => R | undefined | null,
-  ): Err<NonNullable<R>, D | E> {
-    return this as any;
   }
 
   mapOrElse<D, R>(d: (error: E) => D, f: (value: T) => R): R | D {

@@ -6,24 +6,22 @@ Rust APIs? Aside from familiarity to Rust developers, I just like the way the
 Rust API is designed and I find the method names regular enough that it's easy
 to remember most of them based on a few patterns.
 
-## Contents
-
 - [rs-monads](#rs-monads)
-  - [Contents](#contents)
   - [A Motivating Example](#a-motivating-example)
   - [Types Defined by This Package](#types-defined-by-this-package)
   - [Important Functions and Methods](#important-functions-and-methods)
-    - [Creating values](#creating-values)
-    - [Extracting the contents of monad values](#extracting-the-contents-of-monad-values)
-    - [Testing monad values](#testing-monad-values)
-    - [Transforming monad values](#transforming-monad-values)
+    - [Creating instances](#creating-instances)
+    - [Extracting the contents of monad instances](#extracting-the-contents-of-monad-instances)
+    - [Working with nullable values](#working-with-nullable-values)
+    - [Testing monad instances](#testing-monad-instances)
+    - [Transforming monad instances](#transforming-monad-instances)
     - [Side Effects](#side-effects)
     - [Manipulating collections of monad instances](#manipulating-collections-of-monad-instances)
     - [Converting between exceptions, promises and `Result`](#converting-between-exceptions-promises-and-result)
   - [Recipes](#recipes)
     - [Convert truthy values to `Some` and falsy values to `None`](#convert-truthy-values-to-some-and-falsy-values-to-none)
     - [Convert `NaN` values to `None`](#convert-nan-values-to-none)
-    - [Convert nullish values to `Ok`, or supply an error](#convert-nullish-values-to-ok-or-supply-an-error)
+    - [Map a function that returns `null` or `undefined` to indicate a missing result](#map-a-function-that-returns-null-or-undefined-to-indicate-a-missing-result)
     - [Unwrap all values in an array](#unwrap-all-values-in-an-array)
   - [Alternatives](#alternatives)
     - [Uninteresting Forks](#uninteresting-forks)
@@ -76,9 +74,11 @@ intermediate results:
 function pipeline2(a: A | undefined): D | undefined {
   return fromNullable(a)
     .map(convertAToB)
-    .mapNullable(convertBToC)
+    .map(convertBToC)
+    .nonNullable()
     .tap((c) => console.log("After converting to C:", c))
-    .mapNullable(convertCToD)
+    .map(convertCToD)
+    .nonNullable()
     .toNullable();
 }
 ```
@@ -95,10 +95,9 @@ value and `Option.None<T>` does not. These subtypes are also aliased as
 ---
 **`Result<T,E> = Result.Ok<T,E> | Result.Err<T,E>`**
 
-A type that value of type `T | E` `Result.Ok<T,E>` contains a
-value of type `T` and `Result.Err<T,E>` contains a value of type `E` (which typically
-represents an error). These subtypes are also aliased as `Ok<T,E>` and
-`Err<T,E>`.
+An instnace type `Result.Ok<T,E>`, which contains a value of type `T`, or an
+instance of `Result.Err<T,E>`, which contains an error value of type `E`. These
+subtypes are also aliased as `Ok<T,E>` and `Err<T,E>`.
 
 
 ## Important Functions and Methods
@@ -108,7 +107,7 @@ files for complete documentation. Functions marked with a star (★) are also
 available as top-level imports. The variable `m` represents an arbitrary
 instance of a monad type.
 
-### Creating values
+### Creating instances
 
 ---
 **`Option.Some(x)`** ★  
@@ -129,13 +128,13 @@ return type suitable for intializing constants.
 
 ---
 **`Option.fromNullable(x)`** ★  
-Wraps `x` as `Some(x)` unless `x` is `null` or `undefined`, in which case it
-returns `None()`.  Combine with `okOr` or `okOrElse` to produce a `Result`
-instead.
+
+A shorthand for `Some(x).nonNullable()` (decribed below).
 
 ---
 
-### Extracting the contents of monad values
+
+### Extracting the contents of monad instances
 
 ---
 **`m.unwrap()`**  
@@ -152,13 +151,6 @@ If `m` has a non-error value, returns `x.value`, otherwise returns `def` or
 `lazyDef()`.
 
 ---
-**`m.unwrapOrUndef()`**  
-**`m.toNullable()`**  
-
-These synonymous methods are the complement to `fromNullable`. They are
-equivalent to `m.unwrapOr(undefined)`.
-
----
 **`[...before, ...m, ...after]`**
 
 The monad types support the iterator protocol; `Some(x)` and `Ok(x)`, and
@@ -173,7 +165,44 @@ spliced into arrays.
 These fields hold `x` or `e`. They are only defined on the relevant subclasses
 of `Option` and `Result`.
 
-### Testing monad values
+
+### Working with nullable values
+
+Many Javascript APIs use `null` or `undefined` to indicate the absence of a
+value, leading to what TypeScript calls nullable types.  Generally speaking,
+`Option` has a richer set of methods than `Result` for dealing with nullable
+types, because `Option` models the same scenarios as nullable types.
+
+---
+**m.nonNullable()**  
+**m.nonNullableOr(def)**  
+**m.nonNullableOrElse(orElse)**  
+
+Converts `Some(x)` to `None()` when `x` is `null` or `undefined`.  Likewise
+converts `Ok(x)` to `Err(def)` or `Err(lazyDef())`.  `None` or `Err` instances
+are returned unchanged.
+
+---
+**`m.toNullable()`**
+**`m.unwrapOrUndef()`**  
+
+These synonymous `Option` methods are the complement to `fromNullable`. They are
+equivalent to `m.unwrapOr(undefined)`. To get the same effect with a result, use
+`m.ok().toNullable()`.
+
+---
+**Option.fromNullable(x)** ★
+
+Shortand to `Some(x).nonNullable()`. To produce `Result` instances with a
+default error value, use one of the following patterns:
+
+- `fromNullable(x).okOr(def)`
+- `fromNullable(x).okOrElse(lazyDef)`.
+- `Ok(x).nonNullableOr(def, x)`
+- `Ok(x).nonNullableOrElse(lazyDef, x)`.
+
+
+### Testing monad instances
 
 ---
 **`Option.isOption(m)`** ★  
@@ -223,7 +252,8 @@ These functions are the same as the methods above, but they accept values of any
 type and return `false` if the values are not instances of the correct monad
 type.
 
-### Transforming monad values
+
+### Transforming monad instances
 
 ---
 **`m.map(f)`**
@@ -257,20 +287,6 @@ These methods are shorthands for `m.mapOr(f).unwrapOr(def)`,
 `m.mapOrElse(f).unwrapOr(lazyDef)`, and `m.mapOrUndef(f).unwrapOrUndef()`,
 respectively.
 
----
-**`m.mapNullable(f)`**  (for `Option`)
-**`m.mapNullableOr(def, f)`**  (for `Result`)
-**`m.mapNullableOrElse(lazyDef, f)`**  (for `Result`)
-
-Similar to `map`, except when `f` returns `undefined` or `null`. These methods
-obey the following rules:
-
-- `Some(x)` ↦ `Some(f(x))` if `f(x) != null`
-- `Some(x)` ↦ `None()` if `f(x) == null`
-- `None()` ↦ `None()`
-- `Ok(x)` ↦ `Ok(f(x))` if `f(x) != null`
-- `Ok(x)` ↦ `Err(def)` or `Err(lazyDef())` if `f(x) == null`
-- `Err(e)` ↦ `Err(e)`
 
 ### Side Effects
 
@@ -291,7 +307,6 @@ This method calls `f(m)`. Use this function to "tap into" a sequences of
 operations to do something like log an intermediate value:
 
 ---
-**`m.tapValue(f)`**
 **`m.tapSome(f)`**  
 **`m.tapOk(f)`**  
 
@@ -304,6 +319,7 @@ These specialized versions of `tap` call `f(m.value)` for its side effects if
 **`m.tapErr(f)`**
 
 Thse function call `f()` (or `f(m.error)` for `tapErr`) if `m` has no non-error value.
+
 
 ### Manipulating collections of monad instances
 
@@ -351,7 +367,7 @@ and unwrap the remaining values into a new array. The roughly equivalent to
 --- 
 **`Result.unwrapErrs(seq)`** ★
 
-Like `unwrapSomes`, but for `Err` values.
+Like `unwrapSomes`, but for `Err` instances.
 
 ---
 **`Result.unwrapResults(seq)`** ★
@@ -404,7 +420,7 @@ if (x !== undefined) {
 **`r.toPromise(q)`**
 
 These two functions are inverses of each other. The first translates a promise
-`p` to a new promise `q` that always resolves to a `Result` value `r`. The
+`p` to a new promise `q` that always resolves to a `Result` instance `r`. The
 second translates a for a `Result` into a promise that resolves to or rejects
 based on the subtype of `r`. These two functions are inverses, such that
 `Result.fromPromise(p).then(r => r.toPromise())` is equivalent to just `p`.
@@ -445,17 +461,27 @@ if (x !== undefined) {
 
 `Some(x).filter(Boolean)`
 
+
 ### Convert `NaN` values to `None`
 
-`Some(x).filterNot(Number.isNaN)`
+`Some(x).filter((x) => !Number.isNaN(x))`
 
-### Convert nullish values to `Ok`, or supply an error
 
-`Option.fromNullable(x).okOrElse(() => Error("expecting a value"))`
+### Map a function that returns `null` or `undefined` to indicate a missing result
+
+`m.map(f).nonNullable()` (for `Option`)
+`m.map(f).nonNullableOr(def, f)` (for `Result`)
+`m.map(f).nonNullableOrElse(lazyDef, f)` (for `Result`)
+
 
 ### Unwrap all values in an array
 
 `[Some(x), None()].flatMap(y => [...y])`  ↦ `[x]`
+
+Using `Array.from` as the argument to `flapMap` won't work because of the extra
+arguments it passes to `Array.from`.
+
+
 
 ## Alternatives
 
