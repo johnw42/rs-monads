@@ -1,7 +1,7 @@
 // @ts-check
 
 const { Suite } = require("benchmark");
-const { Option } = require("../lib/cjs");
+const { Option, Option2 } = require("../lib/cjs");
 
 const randSeq = [];
 for (let i = 0; i < 1001; i++) {
@@ -34,7 +34,7 @@ let logBuffer;
 function log(s) {
   // Always concatenate a dummy string to avoid the penalizing Option for making
   // slightly longer messages.
-  logBuffer += "lorem ipsum dolor sit amet";
+  //logBuffer += "x";
 }
 
 new Suite("the suite", {
@@ -56,16 +56,20 @@ new Suite("the suite", {
     }
     convertCToD(c);
   })
-  .add("with Option", () => {
-    Option.fromNullable(makeA())
-      .map(convertAToB)
-      .map(convertBToC)
-      .nonNullable()
-      .tap((c) => log(`After converting to C: ${c}`))
-      .map(convertCToD)
-      .nonNullable()
-      .toNullable();
-  })
+  .add(
+    "with Option",
+    () => {
+      Option.fromNullable(makeA())
+        .map(convertAToB)
+        .map(convertBToC)
+        .nonNullable()
+        .tap((c) => log(`After converting to C: ${c}`))
+        .map(convertCToD)
+        .nonNullable()
+        .toNullable();
+    },
+    //{ minSamples: 500 },
+  )
   .on("cycle", (event) => {
     const benchmark = event.target;
     console.log(benchmark.toString());

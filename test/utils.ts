@@ -1,3 +1,20 @@
+import { isOption, isResult } from "../src/index";
+
+(expect as any).addEqualityTesters([
+  function (this: any, a: unknown, b: unknown) {
+    if (isOption(a) && isOption(b)) {
+      return a.equals(b, this.equals);
+    }
+    return undefined;
+  },
+  function (this: any, a: unknown, b: unknown) {
+    if (isResult(a) && isResult(b)) {
+      return a.equals(b, this.equals);
+    }
+    return undefined;
+  },
+]);
+
 export type T = { T: true };
 export type R = { R: true };
 export type E = { E: true };
