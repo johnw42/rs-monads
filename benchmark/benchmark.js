@@ -15,32 +15,34 @@ function nextRand() {
 }
 
 function makeA() {
+  doSomeWork();
   return nextRand() > 0.1 ? "a" : undefined;
 }
 
 function convertAToB(a) {
+  doSomeWork();
   return a + "b";
 }
 
 function convertBToC(b) {
+  doSomeWork();
   return nextRand() > 0.1 ? b + "c" : undefined;
 }
 
 function convertCToD(c) {
+  doSomeWork();
   return nextRand() > 0.1 ? c + "d" : undefined;
 }
 
-let logBuffer;
-function log(s) {
-  // Always concatenate a dummy string to avoid the penalizing Option for making
-  // slightly longer messages.
-  //logBuffer += "x";
+function log(s) {}
+
+function doSomeWork() {
+  Math.sin(Math.exp(nextRand()));
 }
 
 new Suite("the suite", {
   onCycle() {
     randIndex = 0;
-    logBuffer = "";
   },
 })
   .add("naive", () => {
