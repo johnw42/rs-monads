@@ -118,20 +118,9 @@ instance of a monad type.
 Creates an object of the specified type holding the given value.
 
 ---
-**`Option.constSome(x)`** ★  
-**`Option.constNone(x)`** ★  
-**`Option.constOk(x)`** ★  
-**`Option.constErr(e)`** ★
-
-Alternate versions of the similarly-named functions above with a more precise
-return type suitable for intializing constants.
-
----
 **`Option.fromNullable(x)`** ★  
 
 A shorthand for `Some(x).nonNullable()` (decribed below).
-
----
 
 
 ### Extracting the contents of monad instances

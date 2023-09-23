@@ -93,20 +93,6 @@ function collect<T, E>(results: Iterable<Result<T, E>>): Result<T[], E> {
 }
 
 /**
- * Same as {@link Err}, but returns a more specific type.
- */
-export function constErr<T, E>(error: E): Err<T, E> {
-  return new ErrImpl(error);
-}
-
-/**
- * Same as {@link Ok}, but returns a more specific type.
- */
-export function constOk<T, E>(value: T): Ok<T, E> {
-  return new OkImpl(value);
-}
-
-/**
  * Tests whether `a` and `b` are `Result` values which are equal according to
  * `a.equals(b, okCmp, errCmp)`.
  *
@@ -195,18 +181,6 @@ export const Result = {
    * @see {@link constOk}
    */
   Ok,
-
-  // @copy-comment
-  /**
-   * Same as {@link Err}, but returns a more specific type.
-   */
-  constErr,
-
-  // @copy-comment
-  /**
-   * Same as {@link Ok}, but returns a more specific type.
-   */
-  constOk,
 
   // @copy-comment
   /**

@@ -5,8 +5,6 @@ import {
   Option,
   Result,
   Some,
-  constErr,
-  constOk,
   fromPromise,
   isErr,
   isOk,
@@ -34,8 +32,6 @@ describe("Result functions", () => {
 
     expect(Result.Err).toBe(Err);
     expect(Result.Ok).toBe(Ok);
-    expect(Result.constOk).toBe(constOk);
-    expect(Result.constErr).toBe(constErr);
     expect(Result.isErr).toBe(isErr);
     expect(Result.isOk).toBe(isOk);
     expect(Result.isResult).toBe(isResult);
@@ -65,16 +61,6 @@ describe("Result functions", () => {
     }
     expect(Result.collect(iter(true))).toEqual(Err(theE));
     expect(Result.collect(iter(false))).toEqual(Ok([1, 2]));
-  });
-
-  test("constErr", () => {
-    const x: Err<T, E> = constErr(theE);
-    expect(x.isOk()).toBe(false);
-  });
-
-  test("constOk", () => {
-    const x: Ok<T, E> = constOk(theT);
-    expect(x.isOk()).toBe(true);
   });
 
   test("equals", () => {
@@ -160,9 +146,9 @@ describe("Result methods", () => {
   });
 
   test("error", () => {
-    expect(constErr(theT).error).toBe(theT);
+    expect((Err<T, E>(theE) as Err<T, E>).error).toBe(theE);
     // @ts-expect-error
-    expect(Err(theT).error).toBe(theT);
+    expect(Err(theE).error).toBe(theE);
     // @ts-expect-error
     expect(Ok(theT).error).toBe(undefined);
   });
@@ -272,7 +258,9 @@ describe("Result methods", () => {
   test("nonNullableOrElse", () => {
     expect(Ok(theT).nonNullableOrElse(expectArgs(theE))).toEqual(Ok(theT));
     expect(Ok(null).nonNullableOrElse(expectArgs(theE))).toEqual(Err(theE));
-    expect(Ok(undefined).nonNullableOrElse(expectArgs(theE))).toEqual(Err(theE));
+    expect(Ok(undefined).nonNullableOrElse(expectArgs(theE))).toEqual(
+      Err(theE),
+    );
     expect(Err(theE).nonNullableOrElse(expectArgs(theE2))).toEqual(Err(theE));
   });
 
@@ -386,7 +374,7 @@ describe("Result methods", () => {
   });
 
   test("value", () => {
-    expect(constOk(theT).value).toBe(theT);
+    expect((Ok(theT) as Ok<T, E>).value).toBe(theT);
     // @ts-expect-error
     expect(Ok(theT).value).toBe(theT);
     // @ts-expect-error
@@ -394,11 +382,11 @@ describe("Result methods", () => {
   });
 
   test("withType", () => {
-    constErr<T, E>(theE).withType<R>() satisfies Result<R, E>;
+    (Err<T, E>(theE) as Err<T, E>).withType<R>() satisfies Result<R, E>;
   });
 
   test("withErrType", () => {
-    constOk<T, E>(theT).withErrType<E2>() satisfies Result<T, E2>;
+    (Ok<T, E>(theT) as Ok<T, E>).withErrType<E2>() satisfies Result<T, E2>;
   });
 });
 
