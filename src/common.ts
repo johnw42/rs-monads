@@ -71,8 +71,13 @@ export abstract class SingletonMonad<T> implements Iterable<T> {
    * Returns the value contained in this instance, or throws an exception if
    * there is no value.  If given, `lazyError` is called to create the error.
    */
-  abstract unwrap(lazyError?: () => unknown): T;
-  
+  unwrap(lazyError?: () => unknown): T {
+    if (this.#hasValue()) {
+      return this.value;
+    }
+    throw lazyError ? lazyError() : new Error("Missing Option value.");
+  }
+
   /**
    * If `this` is has a value `x`, returns `x`, otherwise returns `defaultValue`.
    */

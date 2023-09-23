@@ -5,10 +5,6 @@ import {
   Option,
   Result,
   Some,
-  constErr,
-  constNone,
-  constOk,
-  constSome,
   fromNullable,
   isNone,
   isOption,
@@ -34,8 +30,6 @@ describe("Option functions", () => {
 
     expect(Option.Some).toBe(Some);
     expect(Option.None).toBe(None);
-    expect(Option.constSome).toBe(constSome);
-    expect(Option.constNone).toBe(constNone);
     expect(Option.fromNullable).toBe(fromNullable);
     expect(Option.isOption).toBe(isOption);
     expect(Option.isSome).toBe(isSome);
@@ -65,14 +59,6 @@ describe("Option functions", () => {
     }
     expect(Option.collect(iter(true))).toEqual(None());
     expect(Option.collect(iter(false))).toEqual(Some([1, 2]));
-  });
-
-  test("constNone", () => {
-    expect(constNone() satisfies None<T>).toEqual(None());
-  });
-
-  test("constSome", () => {
-    expect(constSome(theT) satisfies Some<T>).toEqual(Some(theT));
   });
 
   test("equals", () => {
@@ -122,67 +108,47 @@ describe("Option methods", () => {
   });
 
   test("and", () => {
-    expect(constSome(theT).and(constSome(theE)) satisfies Some<E>).toEqual(
-      Some(theE),
-    );
-    expect(constSome(theT).and(constNone<E>()) satisfies None<E>).toEqual(
-      None(),
-    );
-    expect(constNone<T>().and(constSome(theE)) satisfies None<E>).toEqual(
-      None(),
-    );
-    expect(constNone<T>().and(None<E>()) satisfies None<E>).toEqual(None());
+    expect(Some(theT).and(Some(theE))).toEqual(Some(theE));
+    expect(Some(theT).and(None())).toEqual(None());
+    expect(None().and(Some(theE))).toEqual(None());
+    expect(None().and(None())).toEqual(None());
   });
 
   test("andThen", () => {
     expect(
-      constSome(theT).andThen(
-        expectArgs(constSome(theR), theT),
-      ) satisfies Some<R>,
-    ).toEqual(Some(theR));
-    expect(
-      constSome(theT).andThen(
-        expectArgs(constNone<R>(), theT),
-      ) satisfies None<R>,
-    ).toEqual(None());
-    expect(constNone().andThen(notCalled) satisfies None<R>).toEqual(None());
+      Some(theT)
+        .andThen(expectArgs(Some(theR), theT))
+        .unwrap(),
+    ).toBe(theR);
+    expect(Some(theT).andThen(expectArgs(None(), theT))).toEqual(None());
+    expect(Some(theT).andThen(expectArgs(None(), theT))).toEqual(None());
+    expect(None().andThen(notCalled)).toEqual(None());
   });
 
   // @copy-test flatMap
   test("flatMap", () => {
     expect(
-      constSome(theT).flatMap(
-        expectArgs(constSome(theR), theT),
-      ) satisfies Some<R>,
-    ).toEqual(Some(theR));
-    expect(
-      constSome(theT).flatMap(
-        expectArgs(constNone<R>(), theT),
-      ) satisfies None<R>,
-    ).toEqual(None());
-    expect(constNone().flatMap(notCalled) satisfies None<R>).toEqual(None());
+      Some(theT)
+        .flatMap(expectArgs(Some(theR), theT))
+        .unwrap(),
+    ).toBe(theR);
+    expect(Some(theT).flatMap(expectArgs(None(), theT))).toEqual(None());
+    expect(Some(theT).flatMap(expectArgs(None(), theT))).toEqual(None());
+    expect(None().flatMap(notCalled)).toEqual(None());
   });
 
   test("equals", () => {
-    constSome(theT).equals(constSome(theE)) satisfies boolean;
-    // constSome(theT).equals(constNone<E>()) satisfies false;
-    // constNone<T>().equals(constSome(theE)) satisfies false;
-    // constNone<T>().equals(constNone<E>()) satisfies true;
-    None<T>().equals(None<E>()) satisfies boolean;
-
     testEqualsFn((a, b, cmp) => a.equals(b, cmp));
   });
 
   test("expect", () => {
-    expect(constSome(theT).expect("") satisfies T).toBe(theT);
-    expect(constSome(theT).expect(notCalled) satisfies T).toBe(theT);
+    expect(Some(theT).expect("")).toBe(theT);
+    expect(Some(theT).expect(notCalled)).toBe(theT);
 
     const error1 = Result.try(() => None().expect("xyzzy")).unwrapErr();
     expect(error1).toBeInstanceOf(Error);
     expect((error1 as Error).message).toBe("xyzzy");
-    const error2 = Result.try(
-      () => constNone().expect(() => "xyzzy") satisfies never,
-    ).unwrapErr();
+    const error2 = Result.try(() => None().expect(() => "xyzzy")).unwrapErr();
     expect(error2).toBeInstanceOf(Error);
     expect((error2 as Error).message).toBe("xyzzy");
   });
@@ -193,86 +159,44 @@ describe("Option methods", () => {
     expect(Some(theT).filter(expectArgs(0, theT))).toEqual(None());
     expect(None().filter(notCalled)).toEqual(None());
 
-    constNone<any>().filter(
-      notCalled as unknown as (arg: any) => arg is T[],
-    ) satisfies Option<T[]>;
-    constSome<any>(theT).filter(
-      expectArgs(true, theT) as unknown as (arg: any) => arg is T[],
-    ) satisfies Option<T[]>;
+    None<any>().filter(notCalled as unknown as (arg: any) => arg is T[]) satisfies Option<T[]>;
+    Some<any>(theT).filter(expectArgs(true, theT) as unknown as (arg: any) => arg is T[]) satisfies Option<T[]>;
   });
 
-  test("filterClass", () => {
-    class A {
-      a = 0;
-    }
-    class B extends A {
-      b = 0;
-    }
 
-    expect(constSome<A>(new B()).filterClass(B) satisfies Option<B>).toEqual(
-      Some(new B()),
+  test("filterByType", () => {
+    expect(Some(0).filterType("bigint") satisfies Option<bigint>).toEqual(None());
+    expect(Some(0).filterType("boolean") satisfies Option<boolean>).toEqual(None());
+    expect(Some("").filterType("number") satisfies Option<number>).toEqual(None());
+    expect(Some(0).filterType("object") satisfies Option<object>).toEqual(None());
+    expect(Some(0).filterType("string") satisfies Option<string>).toEqual(None());
+    expect(Some(0).filterType("symbol") satisfies Option<symbol>).toEqual(None());
+    expect(Some(0).filterType("undefined") satisfies Option<undefined>).toEqual(None());
+
+    expect(Some(0n).filterType("bigint").unwrap() === 0n).toBe(true);
+    expect(Some(false).filterType("boolean") satisfies Option<boolean>).toEqual(Some(false));
+    expect(Some(0).filterType("number") satisfies Option<number>).toEqual(Some(0));
+    expect(Some(null).filterType("object") satisfies Option<object>).toEqual(Some(null));
+    expect(Some("").filterType("string") satisfies Option<string>).toEqual(Some(""));
+    expect(Some(Symbol.iterator).filterType("symbol") satisfies Option<symbol>).toEqual(
+      Some(Symbol.iterator),
     );
-    expect(constSome<A>(new A()).filterClass(B) satisfies Option<B>).toEqual(
-      None(),
-    );
-    expect(constNone<A>().filterClass(B) satisfies None<B>).toEqual(None());
+    expect(Some(undefined).filterType("undefined") satisfies Option<undefined>).toEqual(Some(undefined));
   });
 
-  test("filterType", () => {
-    expect(constSome(0).filterType("bigint") satisfies Option<bigint>).toEqual(
-      None(),
-    );
-    expect(
-      constSome(0).filterType("boolean") satisfies Option<boolean>,
-    ).toEqual(None());
-    expect(constSome("").filterType("number") satisfies Option<number>).toEqual(
-      None(),
-    );
-    expect(constSome(0).filterType("object") satisfies Option<object>).toEqual(
-      None(),
-    );
-    expect(constSome(0).filterType("string") satisfies Option<string>).toEqual(
-      None(),
-    );
-    expect(constSome(0).filterType("symbol") satisfies Option<symbol>).toEqual(
-      None(),
-    );
-    expect(
-      constSome(0).filterType("undefined") satisfies Option<undefined>,
-    ).toEqual(None());
-    expect(constNone().filterType("number") satisfies None<number>).toEqual(
-      None(),
-    );
+  test("filterInstanceOf", () => {
+    class A { a = 0; }
+    class B extends A { b = 0; }
 
-    expect(constSome(0n).filterType("bigint").unwrap() === 0n).toBe(true);
-    expect(
-      constSome(false).filterType("boolean") satisfies Option<boolean>,
-    ).toEqual(Some(false));
-    expect(constSome(0).filterType("number") satisfies Option<number>).toEqual(
-      Some(0),
-    );
-    expect(
-      constSome(null).filterType("object") satisfies Option<object>,
-    ).toEqual(Some(null));
-    expect(constSome("").filterType("string") satisfies Option<string>).toEqual(
-      Some(""),
-    );
-    expect(
-      constSome(Symbol.iterator).filterType("symbol") satisfies Option<symbol>,
-    ).toEqual(Some(Symbol.iterator));
-    expect(
-      constSome(undefined).filterType("undefined") satisfies Option<undefined>,
-    ).toEqual(Some(undefined));
-  });
+    expect(Some<A>(new B()).filterClass(B) satisfies Option<B>).toEqual(Some(new B()));
+    expect(Some<A>(new A()).filterClass(B) satisfies Option<B>).toEqual(None());
+    expect(None<A>().filterClass(B) satisfies Option<B>).toEqual(None());
+  })
 
   test("flatten", () => {
-    expect(constSome(constSome(theT)).flatten() satisfies Some<T>).toEqual(
-      Some(theT),
-    );
-    expect(constSome(constNone<T>()).flatten() satisfies None<T>).toEqual(
-      None(),
-    );
-    expect(constNone<Option<T>>().flatten() satisfies None<T>).toEqual(None());
+    expect(Some(Some(theT)).flatten()).toEqual(Some(theT));
+    expect(Some(None()).flatten()).toEqual(None());
+    expect(None<Option<T>>().flatten()).toEqual(None());
   });
 
   test("isNone", () => {
@@ -286,63 +210,41 @@ describe("Option methods", () => {
   });
 
   test("isSomeAnd", () => {
-    expect(
-      constSome(theT).isSomeAnd(expectArgs(true, theT)) satisfies boolean,
-    ).toBe(true);
-    expect(
-      constSome(theT).isSomeAnd(expectArgs(false, theT)) satisfies boolean,
-    ).toBe(false);
-    expect(constNone().isSomeAnd(notCalled) satisfies false).toBe(false);
+    expect(Some(theT).isSomeAnd(expectArgs(true, theT))).toBe(true);
+    expect(Some(theT).isSomeAnd(expectArgs(false, theT))).toBe(false);
+    expect(None().isSomeAnd(notCalled)).toBe(false);
   });
 
   test("map", () => {
-    expect(
-      constSome(theT).map(expectArgs(theR, theT)) satisfies Some<R>,
-    ).toEqual(Some(theR));
-    expect(constNone().map(notCalled) satisfies None<R>).toEqual(None());
+    expect(Some(theT).map(expectArgs(theR, theT))).toEqual(Some(theR));
+    expect(None().map(notCalled)).toEqual(None());
   });
 
   test("mapOr", () => {
-    expect(
-      constSome(theT).mapOr(theE, expectArgs(theR, theT)) satisfies R,
-    ).toBe(theR);
-    expect(constNone().mapOr(theE, notCalled) satisfies E).toBe(theE);
+    expect(Some(theT).mapOr(theE, expectArgs(theR, theT))).toBe(theR);
+    expect(None().mapOr(theE, notCalled)).toBe(theE);
   });
 
   test("mapOrElse", () => {
-    expect(
-      Some(theT).mapOrElse(notCalled, expectArgs(theR, theT)) satisfies R,
-    ).toBe(theR);
-    expect(None().mapOrElse(expectArgs(theE), notCalled) satisfies E).toBe(
-      theE,
-    );
+    expect(Some(theT).mapOrElse(notCalled, expectArgs(theR, theT))).toBe(theR);
+    expect(None().mapOrElse(expectArgs(theR), notCalled)).toBe(theR);
   });
 
   test("mapOrUndef", () => {
-    expect(constSome(theT).mapOrUndef(expectArgs(theR, theT)) satisfies R).toBe(
-      theR,
-    );
-    expect(constNone().mapOrUndef(notCalled) satisfies undefined).toBe(
-      undefined,
-    );
+    expect(Some(theT).mapOrUndef(expectArgs(theR, theT))).toBe(theR);
+    expect(None().mapOrUndef(notCalled)).toBe(undefined);
   });
 
   test("nonNullable", () => {
-    expect(
-      constSome<T | undefined | null>(theT).nonNullable() satisfies Option<T>,
-    ).toEqual(Some(theT));
-    expect(constSome<T | null>(null).nonNullable() satisfies Option<T>).toEqual(
-      None(),
-    );
-    expect(
-      constSome<T | undefined>(undefined).nonNullable() satisfies Option<T>,
-    ).toEqual(None());
-    expect(constNone<T>().nonNullable() satisfies None<T>).toEqual(None());
+    expect(Some(theT).nonNullable()).toEqual(Some(theT));
+    expect(Some(null).nonNullable()).toEqual(None());
+    expect(Some(undefined).nonNullable()).toEqual(None());
+    expect(None().nonNullable()).toEqual(None());
   });
 
   test("okOr", () => {
-    expect(constSome(theT).okOr(theE) satisfies Ok<T, E>).toEqual(Ok(theT));
-    expect(constNone<T>().okOr(theE) satisfies Err<T, E>).toEqual(Err(theE));
+    expect(Some(theT).okOr(theE)).toEqual(Ok(theT));
+    expect(None().okOr(theE).unwrapErr()).toBe(theE);
   });
 
   test("okOrElse", () => {
@@ -352,28 +254,20 @@ describe("Option methods", () => {
   });
 
   test("or", () => {
-    expect(constSome(theT).or(constSome(theE)) satisfies Some<T>).toEqual(
-      Some(theT),
-    );
-    expect(constSome(theT).or(constNone()) satisfies Some<T>).toEqual(
-      Some(theT),
-    );
-    expect(constNone().or(constSome(theE)) satisfies Some<E>).toEqual(
-      Some(theE),
-    );
-    expect(constNone<T>().or(constNone<E>()) satisfies None<E>).toEqual(None());
+    expect(Some(theT).or(Some(theE))).toEqual(Some(theT));
+    expect(Some(theT).or(None())).toEqual(Some(theT));
+    expect(None().or(Some(theE))).toEqual(Some(theE));
+    expect(None().or(None())).toEqual(None());
   });
 
   test("orElse", () => {
-    expect(constSome(theT).orElse(notCalled) satisfies Some<T>).toEqual(
-      Some(theT),
-    );
+    expect(Some(theT).orElse(notCalled)).toEqual(Some(theT));
     expect(
-      constNone<T>().orElse(expectArgs(constSome(theR))) satisfies Some<R>,
-    ).toEqual(Some(theR));
-    expect(
-      constNone<T>().orElse(expectArgs(constNone<R>())) satisfies None<R>,
-    ).toEqual(None());
+      None()
+        .orElse(expectArgs(Some(theT)))
+        .unwrap(),
+    ).toBe(theT);
+    expect(None().orElse(expectArgs(None()))).toEqual(None());
   });
 
   test("tap", () => {
@@ -406,17 +300,11 @@ describe("Option methods", () => {
   });
 
   test("transpose", () => {
-    constSome(Ok<T, E>(theT)).transpose() satisfies Result<Some<T>, E>;
-
-    expect(
-      constSome(constOk<T, E>(theT)).transpose() satisfies Ok<Some<T>, E>,
-    ).toEqual(Ok(Some(theT)));
-    expect(
-      constSome(constErr<T, E>(theE)).transpose() satisfies Err<Some<T>, E>,
-    ).toEqual(Err(theE));
-    expect(
-      constNone<Result<T, E>>().transpose() satisfies Ok<None<T>, E>,
-    ).toEqual(Ok(None()));
+    expect(Some(Ok(theT)).transpose().unwrap()).toEqual(Some(theT));
+    expect(Some(Err(theT)).transpose().unwrapErr()).toBe(theT);
+    expect(None<Result<unknown, unknown>>().transpose().unwrap().isNone()).toBe(
+      true,
+    );
   });
 
   test("toString", () => {
@@ -425,12 +313,21 @@ describe("Option methods", () => {
   });
 
   test("unwrap", () => {
-    expect(constSome(theT).unwrap() satisfies T).toEqual(theT);
-    expect(constSome(theT).unwrap(notCalled) satisfies T).toEqual(theT);
-    expect(() => constNone().unwrap() satisfies never).toThrow(Error);
-    expect(
-      () => constNone().unwrap(() => new Error("xyzzy")) satisfies never,
-    ).toThrow("xyzzy");
+    expect(Some(theT).unwrap()).toBe(theT);
+    expect(Some(theT).unwrap(notCalled)).toBe(theT);
+    expect(() => None().unwrap()).toThrow(Error);
+    expect(() => None().unwrap(() => new Error("xyzzy"))).toThrow("xyzzy");
+  });
+
+  test("unwrapOrUndef", () => {
+    expect(Some(theT).unwrapOrUndef()).toBe(theT);
+    expect(None().unwrapOrUndef()).toBe(undefined);
+  });
+
+  // @copy-test toNullable
+  test("toNullable", () => {
+    expect(Some(theT).toNullable()).toBe(theT);
+    expect(None().toNullable()).toBe(undefined);
   });
 
   test("unwrapOr", () => {
@@ -438,94 +335,55 @@ describe("Option methods", () => {
     expect(None().unwrapOr(theE)).toBe(theE);
   });
 
-  test("unwrapOrUndef", () => {
-    expect(constSome(theT).unwrapOrUndef() satisfies T).toBe(theT);
-    expect(constNone().unwrapOrUndef() satisfies undefined).toBe(undefined);
-  });
-
-  // @copy-test toNullable
-  test("toNullable", () => {
-    expect(constSome(theT).toNullable() satisfies T).toBe(theT);
-    expect(constNone().toNullable() satisfies undefined).toBe(undefined);
-  });
-
   test("unwrapOrElse", () => {
-    expect(constSome(theT).unwrapOrElse(notCalled) satisfies T).toBe(theT);
-    expect(constNone().unwrapOrElse(expectArgs(theR)) satisfies R).toBe(theR);
+    expect(Some(theT).unwrapOrElse(notCalled)).toBe(theT);
+    expect(None().unwrapOrElse(() => theR)).toBe(theR);
   });
 
   test("unwrapUnchecked", () => {
-    expect(constSome(theT).unwrapUnchecked() satisfies T).toBe(theT);
-    expect(constNone<T>().unwrapUnchecked() satisfies never).toBe(undefined);
+    expect(Some(theT).unwrapUnchecked()).toBe(theT);
+    expect(None().unwrapUnchecked()).toBe(undefined);
   });
 
   test("value", () => {
-    expect(constSome(theT).value satisfies T).toBe(theT);
+    expect((Some(theT) as Some<T>).value).toBe(theT);
     // @ts-expect-error
     expect(Some(theT).value).toBe(theT);
     // @ts-expect-error
     expect(None(theT).value).toBe(undefined);
   });
 
-  test("withType", () => {
-    expect(constNone<T>().withType<R>() satisfies None<R>);
-  });
-
   test("unzip", () => {
     expect(
-      constSome([theT, theE] as [T, E]).unzip() satisfies [Some<T>, Some<E>],
+      Some([theT, theE] as [T, E]).unzip(),
     ).toEqual([Some(theT), Some(theE)]);
     expect(
-      constNone<[T,E]>().unzip() satisfies [None<T>, None<E>],
+      None<[T,E]>().unzip(),
     ).toEqual([None(), None()]);
   });
 
   test("xor", () => {
-    expect(constSome(theT).xor(constSome(theE)) satisfies None<T & E>).toEqual(
-      None(),
-    );
-    expect(constSome(theT).xor(constNone<E>()) satisfies Some<T>).toEqual(
-      Some(theT),
-    );
-    expect(constNone<T>().xor(constSome(theE)) satisfies Some<E>).toEqual(
-      Some(theE),
-    );
-    expect(constNone<T>().xor(constNone<E>()) satisfies None<T & E>).toEqual(
-      None(),
-    );
+    expect(Some(theT).xor(Some(theE))).toEqual(None());
+    expect(Some(theT).xor(None())).toEqual(Some(theT));
+    expect(None().xor(Some(theE))).toEqual(Some(theE));
+    expect(None().xor(None())).toEqual(None());
   });
 
   test("zip", () => {
-    expect(constSome(theT).zip(constSome(theE)) satisfies Some<[T, E]>).toEqual(
-      Some([theT, theE]),
-    );
-    expect(constSome(theT).zip(constNone<E>()) satisfies None<[T, E]>).toEqual(
-      None(),
-    );
-    expect(constNone<T>().zip(constSome(theE)) satisfies None<[T, E]>).toEqual(
-      None(),
-    );
-    expect(constNone<T>().zip(constNone<E>()) satisfies None<[T, E]>).toEqual(
-      None(),
-    );
+    expect(Some(theT).zip(Some(theE))).toEqual(Some([theT, theE]));
+    expect(Some(theT).zip(None())).toEqual(None());
+    expect(None().zip(Some(theE))).toEqual(None());
+    expect(None().zip(None())).toEqual(None());
   });
 
   test("zipWith", () => {
     expect(
-      constSome(theT).zipWith(
-        constSome(theE),
-        expectArgs(theR, theT, theE),
-      ) satisfies Some<R>,
-    ).toEqual(Some(theR));
-    expect(
-      constSome(theT).zipWith(constNone(), notCalled) satisfies None<R>,
-    ).toEqual(None());
-    expect(
-      constNone().zipWith(constSome(theE), notCalled) satisfies None<R>,
-    ).toEqual(None());
-    expect(
-      constNone().zipWith(constNone(), notCalled) satisfies None<R>,
-    ).toEqual(None());
+      Some(theT)
+        .zipWith(Some(theE), expectArgs(theR, theT, theE))
+        .unwrap(),
+    ).toBe(theR);
+    expect(Some(theT).zipWith(None(), notCalled)).toEqual(None());
+    expect(None().zipWith(Some(theR), notCalled)).toEqual(None());
   });
 });
 
